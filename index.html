@@ -475,6 +475,7 @@ tr.t-ir .stk { background:#FFF0F0 !important; }
   /* Beer matrix: show Balance (stk-6) instead of Paid (stk-4) on mobile */
   .beer-matrix-wrap .stk-4{display:none !important}
   .beer-matrix-wrap .stk-5{display:none !important}
+  .beer-matrix-wrap .stk-5b{display:none !important}
   .beer-matrix-wrap .stk-6{
     display:table-cell !important;
     left:128px !important;
@@ -1676,7 +1677,7 @@ function renderBeerMatrix(s, players, games) {
   let head = `<tr>
     <th class="stk stk-2">Pos</th><th class="stk stk-3">Name</th>
     <th class="stk stk-4">Paid</th><th class="stk stk-5b">Beers</th>
-    <th class="stk stk-5">Balance</th>`;
+    <th class="stk stk-6">Balance</th>`;
   games.forEach((g, idx) => {
     head += `<th class="game-col" title="${esc(g.opponent || 'TBD')}">
       <div class="gnum">GAME ${g.number || idx + 1}</div>
@@ -2797,7 +2798,7 @@ function sendInOutWhatsApp(gameId) {
   const dateStr = g.date ? fmtDateShort(g.date) : 'TBD';
   const timeStr = g.time || 'TBD';
   const loc = g.location ? '\n📍 ' + g.location : '';
-  const msg = `🏒 ${teamName} – Game ${g.number || ''}\n${opp}\n📅 ${dateStr} · ${timeStr}${loc}\n\nAre you IN or OUT?\nReply ✅ IN or ❌ OUT`;
+  const msg = `🐻🐻🐻 Game ${g.number || ''} ${opp} 🐻🐻🐻\n⭐⭐⭐ ${dateStr} · ${timeStr} ⭐⭐⭐${loc}\n\nAre you IN or OUT?\nReply ✅ IN or ❌ OUT`;
   const url = 'https://wa.me/?text=' + encodeURIComponent(msg);
   window.open(url, '_blank');
 }
@@ -3293,6 +3294,14 @@ async function importBulkPhotos(input) {
   render();
 }
 
+</script>
+<!-- PWA service worker registration -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
