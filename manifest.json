@@ -1,6 +1,6 @@
 {
   "name": "Three Bears Hockey Hub",
-  "short_name": "Three Bears",
+  "short_name": "3 Bears",
   "description": "Hockey team dashboard — roster, schedule, beer bank & lineups",
   "start_url": "./index.html",
   "display": "standalone",
