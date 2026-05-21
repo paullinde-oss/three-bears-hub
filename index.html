@@ -31,8 +31,10 @@
 :root{--ink:#1A1A1A;--ink-2:#2D2D2D;--ice:#8FB8D4;--ice-light:#D8E7F1;--ice-deep:#4A7FA0;--paper:#F4EFE3;--paper-2:#ECE5D3;--paper-3:#FBF8EF;--rust:#C75A2C;--rust-deep:#8E4324;--text:#1A1A1A;--muted:#6B6B6B;--line:#D9D2C2;--line-dark:#C0B89F;--in-bg:#C8E6C9;--in-text:#1B5E20;--out-bg:#FFCDD2;--out-text:#8E2424;--cut-bg:#BBDEFB;--cut-text:#1565C0;--good:#2C7A4B;--bad:#B83838;--warn:#C99738;--beer-1:#FFF3D6;--beer-2:#FCE3A6;--beer-3:#F5CB6B;--beer-4:#E9A93B;--beer-5:#C77A1F}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{background:var(--paper);background-image:radial-gradient(circle at 12% 8%,rgba(143,184,212,0.10) 0%,transparent 50%),radial-gradient(circle at 88% 92%,rgba(199,90,44,0.08) 0%,transparent 50%);color:var(--text);font-family:'DM Sans',-apple-system,sans-serif;font-size:14px;line-height:1.5;min-height:100vh}
-.app{max-width:1400px;margin:0 auto;padding:22px 20px 80px}
+body{background:var(--paper);background-image:radial-gradient(circle at 12% 8%,rgba(143,184,212,0.10) 0%,transparent 50%),radial-gradient(circle at 88% 92%,rgba(199,90,44,0.08) 0%,transparent 50%);color:var(--text);font-family:'DM Sans',-apple-system,sans-serif;font-size:14px;line-height:1.5;min-height:100vh;transition:background-image 0.4s}
+body.bg-rink::before{content:'';position:fixed;inset:0;background:url('hockey_rink.png') center center/cover no-repeat;opacity:0.07;pointer-events:none;z-index:0}
+body.bg-parking::before{content:'';position:fixed;inset:0;background:url('parking_lot.png') center center/cover no-repeat;opacity:0.09;pointer-events:none;z-index:0}
+.app{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:22px 20px 80px}
 .masthead{border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:22px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:16px}
 .brand-logo{width:120px;height:88px;flex-shrink:0;background-size:contain;background-repeat:no-repeat;background-position:left center;background-position:center}
@@ -1308,6 +1310,9 @@ function renderHeader() {
 function render() {
   renderHeader();
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
+  document.body.classList.remove('bg-rink','bg-parking');
+  if (activeTab === 'dashboard' || activeTab === 'lineup') document.body.classList.add('bg-rink');
+  else if (activeTab === 'beer') document.body.classList.add('bg-parking');
   const c = document.getElementById('content');
   if (activeTab === 'dashboard') c.innerHTML = renderDashboard();
   else if (activeTab === 'beer') c.innerHTML = renderBeerBank();
