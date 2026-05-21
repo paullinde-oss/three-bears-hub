@@ -440,11 +440,12 @@ body.is-admin .matrix .carry-cell input:focus{border-color:var(--rust);backgroun
 .sc-card {
   display:flex;align-items:flex-start;gap:8px;
   background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);
-  border-radius:8px;padding:8px 8px;backdrop-filter:blur(4px);
+  border-radius:8px;padding:8px;backdrop-filter:blur(4px);
+  min-height:80px;box-sizing:border-box;
 }
 .sc-card.sc-empty {
   align-items:center;justify-content:center;
-  min-height:60px;opacity:0.4;
+  min-height:80px;opacity:0.4;
   background:rgba(255,255,255,0.05);
 }
 .sc-av-wrap {
@@ -479,7 +480,18 @@ body.is-admin .matrix .carry-cell input:focus{border-color:var(--rust);backgroun
 .scn-bottom {
   display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px 10px 14px;
 }
-.scn-stats-col {
+.scn-counts {
+  display:flex;flex-direction:column;gap:2px;
+  background:rgba(0,0,0,0.4);border-radius:8px;
+  padding:8px 10px;border:1px solid rgba(255,140,0,0.3);
+  flex-shrink:0;
+}
+.scn-count-row {
+  font-family:'Press Start 2P',monospace;font-size:7px;
+  color:rgba(255,255,255,0.7);text-shadow:1px 1px 0 rgba(0,0,0,0.9);
+  white-space:nowrap;
+}
+.scn-count-row span { color:#FF8C00; }
   background:rgba(0,0,0,0.4);border-radius:8px;padding:8px 12px;
   display:flex;flex-direction:column;gap:8px;justify-content:center;
   border:1px solid rgba(255,140,0,0.3);
@@ -732,8 +744,25 @@ tr.t-ir .stk { background:#FFF0F0 !important; }
 </div>
 <script>
   const isMobile = window.innerWidth < 900 || window.innerHeight < 800;
+  const splashVideo = document.getElementById('splashVideo');
   document.getElementById('splashSrc').src = isMobile ? 'splash_screen_1080_1920.mp4' : 'splash_screen_1920_1080.mp4';
   document.getElementById('splashAudioSrc').src = isMobile ? 'splash_screen_1080_1920_sound.mp3' : 'splash_screen_1920_1080_sound.mp3';
+
+  // Skip splash if video hasn't started within 2 seconds
+  const splashTimeout = setTimeout(() => {
+    const splash = document.getElementById('splashScreen');
+    if (splash) splash.remove();
+  }, 2000);
+
+  // Video started playing — cancel the timeout, it loaded fine
+  splashVideo.addEventListener('playing', () => clearTimeout(splashTimeout));
+
+  // Can't autoplay at all — skip immediately
+  splashVideo.play().catch(() => {
+    clearTimeout(splashTimeout);
+    const splash = document.getElementById('splashScreen');
+    if (splash) splash.remove();
+  });
 
   let soundOn = false;
   function toggleSplashSound() {
@@ -1430,13 +1459,13 @@ function openShareLineup(gameId) {
   // Compute beer totals per player
   const beerTotals = {};
   players.forEach(p => {
-    beerTotals[p.id] = games.reduce((sum,g) => sum + (parseInt(state.beer?.[g.id]?.[p.id])||0), 0);
+    beerTotals[p.id] = games.reduce((sum,g) => sum + (parseInt((state.beers?.[g.id]||{})[p.id])||0), 0);
   });
 
   // Compute BPG per player
   const bpgMap = {};
   players.forEach(p => {
-    const gPlayed = games.filter(g => (state.attendance?.[g.id]?.[p.id]==='in') || parseInt(state.beer?.[g.id]?.[p.id]||0)>0).length;
+    const gPlayed = games.filter(g => (state.attendance?.[g.id]?.[p.id]==='in') || parseInt((state.beers?.[g.id]||{})[p.id]||0)>0).length;
     bpgMap[p.id] = gPlayed > 0 ? (beerTotals[p.id]/gPlayed).toFixed(1) : '0.0';
   });
 
@@ -1450,13 +1479,13 @@ function openShareLineup(gameId) {
 
   // Beer lover: most games with ≥1 beer
   const beerSessions = {};
-  players.forEach(p => { beerSessions[p.id]=games.filter(g=>parseInt(state.beer?.[g.id]?.[p.id]||0)>=1).length; });
+  players.forEach(p => { beerSessions[p.id]=games.filter(g=>parseInt((state.beers?.[g.id]||{})[p.id]||0)>=1).length; });
   const maxSess = Math.max(0, ...Object.values(beerSessions));
   if (maxSess>0) players.filter(p=>beerSessions[p.id]===maxSess).forEach(p=>addTrophy(p.id, BADGE_BEER_LOVER_B64));
 
   // Three beers: most games with exactly 3
   const threeCnt = {};
-  players.forEach(p => { threeCnt[p.id]=games.filter(g=>parseInt(state.beer?.[g.id]?.[p.id]||0)===3).length; });
+  players.forEach(p => { threeCnt[p.id]=games.filter(g=>parseInt((state.beers?.[g.id]||{})[p.id]||0)===3).length; });
   const maxThree = Math.max(0, ...Object.values(threeCnt));
   if (maxThree>0) players.filter(p=>threeCnt[p.id]===maxThree).forEach(p=>addTrophy(p.id, BADGE_THREE_BEERS_B64));
 
@@ -1472,8 +1501,9 @@ function openShareLineup(gameId) {
     if (!p) return `<div class="sc-card sc-empty"><span class="sc-pos">${pos}</span><span class="sc-empty-name">—</span></div>`;
     const badges = trophyMap[p.id]||[];
     const bSize = badges.length>1 ? 14 : 20;
-    const badgesHtml = badges.map(b=>`<img src="data:image/png;base64,${b}" style="width:${bSize}px;height:${bSize}px;">`).join('');
+    const badgesHtml = badges.map(b=>`<img src="data:image/png;base64,${b}" style="width:${bSize}px;height:${bSize}px;image-rendering:pixelated;">`).join('');
     const av = renderAvatar(p,'md');
+    const jersey = p.jerseyNumber || p.jersey || '?';
     return `<div class="sc-card">
       <div class="sc-av-wrap">
         ${av}
@@ -1481,7 +1511,8 @@ function openShareLineup(gameId) {
       </div>
       <div class="sc-info">
         <div class="sc-name">${esc(p.name)}</div>
-        <div class="sc-sub">#${esc(p.jersey||'?')} | ${bpgMap[p.id]} BPG 🍺</div>
+        <div class="sc-sub">#${esc(jersey)}</div>
+        <div class="sc-sub">${bpgMap[p.id]} BPG 🍺</div>
         ${p.notes?`<div class="sc-note">${esc(p.notes)}</div>`:''}
       </div>
     </div>`;
@@ -1503,6 +1534,9 @@ function openShareLineup(gameId) {
   ].filter(s=>s.p);
 
   const goalieP = sp(lu.g);
+  const fCount = fwdSlots.length;
+  const dCount = defSlots.length;
+  const bodyCount = fCount + dCount;
 
   const existing = document.getElementById('shareOverlay');
   if (existing) existing.remove();
@@ -1513,9 +1547,14 @@ function openShareLineup(gameId) {
     <div class="share-card-new" id="shareCard">
       <div class="scn-header">
         <img src="data:image/png;base64,${PIXEL_LOGO_B64}" class="scn-logo">
-        <div>
+        <div style="flex:1;">
           <div class="scn-game-num">GAME ${game.number||''}</div>
           <div class="scn-game-detail">${dateStr}${timeStr?' · '+timeStr:''}<br>${oppStr}</div>
+        </div>
+        <div class="scn-counts">
+          <div class="scn-count-row">F: <span>${fCount}</span></div>
+          <div class="scn-count-row">D: <span>${dCount}</span></div>
+          <div class="scn-count-row">Bodies: <span>${bodyCount}</span></div>
         </div>
       </div>
       <div class="scn-section-hdr">⚔ FORWARDS</div>
