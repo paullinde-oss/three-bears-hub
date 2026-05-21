@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,800&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,800&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Press+Start+2P&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
 <style>
 :root{--ink:#1A1A1A;--ink-2:#2D2D2D;--ice:#8FB8D4;--ice-light:#D8E7F1;--ice-deep:#4A7FA0;--paper:#F4EFE3;--paper-2:#ECE5D3;--paper-3:#FBF8EF;--rust:#C75A2C;--rust-deep:#8E4324;--text:#1A1A1A;--muted:#6B6B6B;--line:#D9D2C2;--line-dark:#C0B89F;--in-bg:#C8E6C9;--in-text:#1B5E20;--out-bg:#FFCDD2;--out-text:#8E2424;--cut-bg:#BBDEFB;--cut-text:#1565C0;--good:#2C7A4B;--bad:#B83838;--warn:#C99738;--beer-1:#FFF3D6;--beer-2:#FCE3A6;--beer-3:#F5CB6B;--beer-4:#E9A93B;--beer-5:#C77A1F}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -404,105 +404,101 @@ body.is-admin .matrix .carry-cell input:focus{border-color:var(--rust);backgroun
 
 /* ── NEW PIXEL SHARE CARD ── */
 .share-card-new {
-  background: url('game_card_bg.png') center top/cover no-repeat;
-  max-width:500px;width:100%;border-radius:12px;overflow:hidden;
-  position:relative;box-shadow:0 12px 48px rgba(0,0,0,0.6);
+  background:url('game_card_bg.png') center top/cover no-repeat;
+  max-width:460px;width:100%;border-radius:16px;overflow:hidden;
+  position:relative;box-shadow:0 16px 64px rgba(0,0,0,0.8);
 }
 .share-card-new::before {
   content:'';position:absolute;inset:0;
-  background:rgba(8,16,28,0.60);pointer-events:none;
+  background:rgba(10,18,30,0.74);pointer-events:none;
 }
 .share-card-new > * { position:relative; }
 .scn-header {
-  display:flex;align-items:center;gap:12px;
-  padding:14px 16px;border-bottom:2px solid rgba(255,130,0,0.7);
-  background:rgba(0,0,0,0.3);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 14px 12px;
+  border-bottom:2px solid rgba(255,130,0,0.8);
+  background:rgba(0,0,0,0.4);gap:10px;
 }
+.scn-header-left { display:flex;align-items:center;gap:10px;flex:1;min-width:0; }
 .scn-logo { width:64px;height:64px;object-fit:contain;image-rendering:pixelated;flex-shrink:0; }
 .scn-game-num {
-  font-family:'Press Start 2P',monospace;font-size:16px;
-  color:#FF8C00;letter-spacing:1px;text-shadow:2px 2px 0 rgba(0,0,0,0.8);
+  font-family:'Press Start 2P',monospace;font-size:20px;
+  color:#FF8C00;text-shadow:3px 3px 0 rgba(0,0,0,0.9);line-height:1;
 }
 .scn-game-detail {
   font-family:'Press Start 2P',monospace;font-size:7px;
-  color:#fff;margin-top:6px;line-height:1.8;opacity:0.9;
+  color:#fff;margin-top:8px;line-height:2.2;
   text-shadow:1px 1px 0 rgba(0,0,0,0.9);
-}
-.scn-section-hdr {
-  font-family:'Press Start 2P',monospace;font-size:8px;
-  color:#FF8C00;letter-spacing:1px;padding:8px 16px 4px;
-  text-shadow:1px 1px 0 rgba(0,0,0,0.9);
-}
-.scn-grid {
-  display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px 10px 8px;
-}
-.scn-grid-2 { grid-template-columns:repeat(2,1fr); }
-.sc-card {
-  display:flex;align-items:flex-start;gap:8px;
-  background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);
-  border-radius:8px;padding:8px;backdrop-filter:blur(4px);
-  min-height:80px;box-sizing:border-box;
-}
-.sc-card.sc-empty {
-  align-items:center;justify-content:center;
-  min-height:80px;opacity:0.4;
-  background:rgba(255,255,255,0.05);
-}
-.sc-av-wrap {
-  position:relative;flex-shrink:0;width:44px;
-}
-.sc-av-wrap .avatar { width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,140,0,0.6); }
-.sc-badges {
-  display:flex;flex-wrap:wrap;gap:1px;margin-top:2px;
-  justify-content:center;
-}
-.sc-badges img { image-rendering:pixelated; }
-.sc-info { flex:1;min-width:0; }
-.sc-name {
-  font-family:'Press Start 2P',monospace;font-size:7px;
-  color:#fff;line-height:1.4;text-shadow:1px 1px 0 rgba(0,0,0,0.9);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.sc-sub {
-  font-family:'JetBrains Mono',monospace;font-size:9px;
-  color:#FFD580;margin-top:3px;line-height:1.3;
-}
-.sc-note {
-  font-family:'JetBrains Mono',monospace;font-size:8px;
-  color:rgba(255,255,255,0.6);margin-top:2px;font-style:italic;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.sc-pos {
-  font-family:'JetBrains Mono',monospace;font-size:8px;
-  color:rgba(255,255,255,0.5);
-}
-.sc-empty-name { font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(255,255,255,0.3); }
-.scn-bottom {
-  display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px 10px 14px;
 }
 .scn-counts {
-  display:flex;flex-direction:column;gap:2px;
-  background:rgba(0,0,0,0.4);border-radius:8px;
-  padding:8px 10px;border:1px solid rgba(255,140,0,0.3);
-  flex-shrink:0;
+  background:rgba(0,0,0,0.55);border:1px solid rgba(255,130,0,0.5);
+  border-radius:8px;padding:8px 12px;flex-shrink:0;
 }
 .scn-count-row {
   font-family:'Press Start 2P',monospace;font-size:7px;
-  color:rgba(255,255,255,0.7);text-shadow:1px 1px 0 rgba(0,0,0,0.9);
-  white-space:nowrap;
+  color:rgba(255,255,255,0.8);line-height:2.2;white-space:nowrap;
 }
 .scn-count-row span { color:#FF8C00; }
-  background:rgba(0,0,0,0.4);border-radius:8px;padding:8px 12px;
-  display:flex;flex-direction:column;gap:8px;justify-content:center;
-  border:1px solid rgba(255,140,0,0.3);
+.scn-section-hdr {
+  font-family:'Press Start 2P',monospace;font-size:9px;
+  color:#FF8C00;padding:10px 14px 5px;
+  text-shadow:1px 1px 0 rgba(0,0,0,0.9);
+}
+.scn-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:2px 10px 8px; }
+.scn-grid-2 { display:grid;grid-template-columns:repeat(2,1fr);gap:6px;padding:2px 10px 8px; }
+.scn-bottom { display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:2px 10px 14px; }
+.sc-card {
+  display:flex;flex-direction:column;align-items:center;
+  background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.18);
+  border-radius:10px;padding:10px 6px 8px;
+  backdrop-filter:blur(6px);height:158px;box-sizing:border-box;
+}
+.sc-card.sc-empty {
+  align-items:center;justify-content:center;opacity:0.4;
+  background:rgba(255,255,255,0.05);
+}
+.sc-av-col { display:flex;flex-direction:column;align-items:center;gap:3px; }
+.sc-av-col .avatar { width:58px;height:58px;border-radius:50%;border:2px solid rgba(255,140,0,0.7); }
+.sc-pos {
+  font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:600;
+  color:rgba(255,200,100,0.9);background:rgba(0,0,0,0.55);
+  padding:1px 5px;border-radius:3px;margin-top:2px;
+}
+.sc-info {
+  width:100%;text-align:center;margin-top:6px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;overflow:hidden;
+}
+.sc-name {
+  font-family:'Orbitron',sans-serif;font-size:13px;font-weight:900;
+  color:#fff;text-shadow:1px 1px 0 rgba(0,0,0,0.9);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  width:100%;text-align:center;letter-spacing:0.5px;
+}
+.sc-row2 { display:flex;align-items:center;justify-content:center;gap:6px;width:100%; }
+.sc-jersey {
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;
+  color:#FF8C00;white-space:nowrap;
+}
+.sc-bpg { font-family:'JetBrains Mono',monospace;font-size:9px;color:#FFD580;white-space:nowrap; }
+.sc-note {
+  font-family:'JetBrains Mono',monospace;font-size:8px;
+  color:rgba(255,255,255,0.5);font-style:italic;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  width:100%;text-align:center;min-height:11px;
+}
+.sc-empty-name { font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(255,255,255,0.3); }
+.scn-stats-col {
+  background:rgba(0,0,0,0.55);border:1px solid rgba(255,130,0,0.5);
+  border-radius:10px;padding:12px 14px;
+  display:flex;flex-direction:column;justify-content:center;gap:14px;
 }
 .scn-stat-item {
-  font-family:'Press Start 2P',monospace;font-size:13px;
-  color:#FF8C00;text-shadow:2px 2px 0 rgba(0,0,0,0.9);line-height:1.4;
+  font-family:'Press Start 2P',monospace;font-size:18px;
+  color:#FF8C00;text-shadow:2px 2px 0 rgba(0,0,0,0.9);line-height:1;
 }
 .scn-stat-lbl {
-  font-family:'JetBrains Mono',monospace;font-size:9px;
-  color:rgba(255,255,255,0.6);display:block;margin-top:1px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  color:#fff;margin-top:5px;opacity:0.85;display:block;
 }
 
 /* ── sticky column shift (no # column) ── */
@@ -1456,87 +1452,63 @@ function openShareLineup(gameId) {
   const games = seasonGames(s?.id||'');
   const sp = v => slotPlayer(v, players);
 
-  // Compute beer totals per player
+  // Beer totals & BPG per player
   const beerTotals = {};
   players.forEach(p => {
-    beerTotals[p.id] = games.reduce((sum,g) => sum + (parseInt((state.beers?.[g.id]||{})[p.id])||0), 0);
+    beerTotals[p.id] = games.reduce((sum,g)=>sum+(parseInt((state.beers?.[g.id]||{})[p.id])||0),0);
   });
-
-  // Compute BPG per player
   const bpgMap = {};
   players.forEach(p => {
-    const gPlayed = games.filter(g => (state.attendance?.[g.id]?.[p.id]==='in') || parseInt((state.beers?.[g.id]||{})[p.id]||0)>0).length;
-    bpgMap[p.id] = gPlayed > 0 ? (beerTotals[p.id]/gPlayed).toFixed(1) : '0.0';
+    const gp = games.filter(g=>(state.attendance?.[g.id]?.[p.id]==='in')||parseInt((state.beers?.[g.id]||{})[p.id]||0)>0).length;
+    bpgMap[p.id] = gp>0 ? (beerTotals[p.id]/gp).toFixed(1) : '0.0';
   });
 
-  // Trophy map: which trophies does each player hold
-  const trophyMap = {};
-  const addTrophy = (pid, badge) => { if (!trophyMap[pid]) trophyMap[pid]=[]; trophyMap[pid].push(badge); };
-
-  // Beer master: most total beers
-  const maxBeers = Math.max(0, ...players.map(p=>beerTotals[p.id]));
-  if (maxBeers>0) players.filter(p=>beerTotals[p.id]===maxBeers).forEach(p=>addTrophy(p.id, BADGE_BEER_MASTER_B64));
-
-  // Beer lover: most games with ≥1 beer
-  const beerSessions = {};
-  players.forEach(p => { beerSessions[p.id]=games.filter(g=>parseInt((state.beers?.[g.id]||{})[p.id]||0)>=1).length; });
-  const maxSess = Math.max(0, ...Object.values(beerSessions));
-  if (maxSess>0) players.filter(p=>beerSessions[p.id]===maxSess).forEach(p=>addTrophy(p.id, BADGE_BEER_LOVER_B64));
-
-  // Three beers: most games with exactly 3
-  const threeCnt = {};
-  players.forEach(p => { threeCnt[p.id]=games.filter(g=>parseInt((state.beers?.[g.id]||{})[p.id]||0)===3).length; });
-  const maxThree = Math.max(0, ...Object.values(threeCnt));
-  if (maxThree>0) players.filter(p=>threeCnt[p.id]===maxThree).forEach(p=>addTrophy(p.id, BADGE_THREE_BEERS_B64));
-
   // Team stats
-  const scoredGames = games.filter(g=>!isNaN(parseInt(g.ourScore))&&!isNaN(parseInt(g.theirScore)));
-  const wins = scoredGames.filter(g=>parseInt(g.ourScore)>parseInt(g.theirScore)).length;
-  const losses = scoredGames.filter(g=>parseInt(g.ourScore)<parseInt(g.theirScore)).length;
+  const scored = games.filter(g=>!isNaN(parseInt(g.ourScore))&&!isNaN(parseInt(g.theirScore)));
+  const wins = scored.filter(g=>parseInt(g.ourScore)>parseInt(g.theirScore)).length;
+  const losses = scored.filter(g=>parseInt(g.ourScore)<parseInt(g.theirScore)).length;
   const totalBeers = players.reduce((s,p)=>s+beerTotals[p.id],0);
-  const teamBpg = scoredGames.length>0 ? (totalBeers/scoredGames.length).toFixed(1) : '0.0';
+  const teamBpg = scored.length>0 ? (totalBeers/scored.length).toFixed(1) : '0.0';
 
-  // Render a player card
+  // Render player card
   const renderCard = (p, pos) => {
-    if (!p) return `<div class="sc-card sc-empty"><span class="sc-pos">${pos}</span><span class="sc-empty-name">—</span></div>`;
-    const badges = trophyMap[p.id]||[];
-    const bSize = badges.length>1 ? 14 : 20;
-    const badgesHtml = badges.map(b=>`<img src="data:image/png;base64,${b}" style="width:${bSize}px;height:${bSize}px;image-rendering:pixelated;">`).join('');
-    const av = renderAvatar(p,'md');
-    const jersey = p.jerseyNumber || p.jersey || '?';
+    if (!p) return `<div class="sc-card sc-empty"><span class="sc-empty-name">—</span></div>`;
+    const flip = pos==='RW'||pos==='RD';
+    const flipStyle = flip ? 'transform:scaleX(-1);' : '';
+    const jersey = p.jerseyNumber||p.jersey||'?';
+    const noteHtml = p.notes ? `<div class="sc-note">${esc(p.notes)}</div>` : '<div class="sc-note">&nbsp;</div>';
     return `<div class="sc-card">
-      <div class="sc-av-wrap">
-        ${av}
-        ${badgesHtml?`<div class="sc-badges">${badgesHtml}</div>`:''}
+      <div class="sc-av-col">
+        <div style="${flipStyle}">${renderAvatar(p,'md')}</div>
+        <div class="sc-pos">${pos}</div>
       </div>
       <div class="sc-info">
         <div class="sc-name">${esc(p.name)}</div>
-        <div class="sc-sub">#${esc(jersey)}</div>
-        <div class="sc-sub">${bpgMap[p.id]} BPG 🍺</div>
-        ${p.notes?`<div class="sc-note">${esc(p.notes)}</div>`:''}
+        <div class="sc-row2">
+          <span class="sc-jersey">#${esc(jersey)}</span>
+          <span class="sc-bpg">🍺 ${bpgMap[p.id]}</span>
+        </div>
+        ${noteHtml}
       </div>
     </div>`;
   };
-
-  const dateStr = game.date ? fmtDateShort(game.date) : '';
-  const timeStr = game.time ? fmtAmPm(game.time) : '';
-  const oppStr = (game.isHome?'vs ':'@ ')+(game.opponent||'TBD');
 
   const fwdSlots = [
     {p:sp(lu.f1?.L),pos:'LW'},{p:sp(lu.f1?.C),pos:'C'},{p:sp(lu.f1?.R),pos:'RW'},
     {p:sp(lu.f2?.L),pos:'LW'},{p:sp(lu.f2?.C),pos:'C'},{p:sp(lu.f2?.R),pos:'RW'},
     {p:sp(lu.f3?.L),pos:'LW'},{p:sp(lu.f3?.C),pos:'C'},{p:sp(lu.f3?.R),pos:'RW'},
   ].filter(s=>s.p);
-
   const defSlots = [
     {p:sp(lu.d1?.L),pos:'LD'},{p:sp(lu.d1?.R),pos:'RD'},
     {p:sp(lu.d2?.L),pos:'LD'},{p:sp(lu.d2?.R),pos:'RD'},
   ].filter(s=>s.p);
-
   const goalieP = sp(lu.g);
   const fCount = fwdSlots.length;
   const dCount = defSlots.length;
-  const bodyCount = fCount + dCount;
+
+  const dateStr = game.date ? fmtDateShort(game.date) : '';
+  const timeStr = game.time ? fmtAmPm(game.time) : '';
+  const oppStr = (game.isHome?'vs ':'@ ')+(game.opponent||'TBD');
 
   const existing = document.getElementById('shareOverlay');
   if (existing) existing.remove();
@@ -1546,30 +1518,38 @@ function openShareLineup(gameId) {
   overlay.innerHTML = `
     <div class="share-card-new" id="shareCard">
       <div class="scn-header">
-        <img src="data:image/png;base64,${PIXEL_LOGO_B64}" class="scn-logo">
-        <div style="flex:1;">
-          <div class="scn-game-num">GAME ${game.number||''}</div>
-          <div class="scn-game-detail">${dateStr}${timeStr?' · '+timeStr:''}<br>${oppStr}</div>
+        <div class="scn-header-left">
+          <img src="data:image/png;base64,${PIXEL_LOGO_B64}" class="scn-logo">
+          <div>
+            <div class="scn-game-num">GAME ${game.number||''}</div>
+            <div class="scn-game-detail">${dateStr}${timeStr?' · '+timeStr:''}<br>${oppStr}</div>
+          </div>
         </div>
         <div class="scn-counts">
           <div class="scn-count-row">F: <span>${fCount}</span></div>
           <div class="scn-count-row">D: <span>${dCount}</span></div>
-          <div class="scn-count-row">Bodies: <span>${bodyCount}</span></div>
+          <div class="scn-count-row">Bodies: <span>${fCount+dCount}</span></div>
         </div>
       </div>
       <div class="scn-section-hdr">⚔ FORWARDS</div>
       <div class="scn-grid">${fwdSlots.map(s=>renderCard(s.p,s.pos)).join('')}</div>
       <div class="scn-section-hdr">🛡 DEFENSE</div>
-      <div class="scn-grid scn-grid-2">${defSlots.map(s=>renderCard(s.p,s.pos)).join('')}</div>
+      <div class="scn-grid-2">${defSlots.map(s=>renderCard(s.p,s.pos)).join('')}</div>
       <div class="scn-bottom">
         <div>
-          <div class="scn-section-hdr">🥅 GOALIE</div>
+          <div class="scn-section-hdr" style="padding-left:0;">🥅 GOALIE</div>
           ${renderCard(goalieP,'G')}
         </div>
         <div class="scn-stats-col">
-          <div class="scn-section-hdr" style="padding:0 0 6px;">📊 STATS</div>
-          <div class="scn-stat-item">${wins}-${losses}<span class="scn-stat-lbl">WIN - LOSS</span></div>
-          <div class="scn-stat-item">${teamBpg} 🍺<span class="scn-stat-lbl">TEAM BPG</span></div>
+          <div class="scn-section-hdr" style="padding:0 0 4px;font-size:9px;">📊 STATS</div>
+          <div>
+            <div class="scn-stat-item">${wins}-${losses}</div>
+            <span class="scn-stat-lbl">WIN — LOSS</span>
+          </div>
+          <div>
+            <div class="scn-stat-item">${teamBpg} 🍺</div>
+            <span class="scn-stat-lbl">TEAM BPG</span>
+          </div>
         </div>
       </div>
     </div>
