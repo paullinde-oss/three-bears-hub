@@ -625,6 +625,26 @@ tr.t-ir .stk { background:#FFF0F0 !important; }
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
+<div id="splashScreen" style="position:fixed;inset:0;background:#1A2B3C;z-index:10000;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="this.remove(); document.getElementById('splashAudio').pause()">
+  <video id="splashVideo" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;" onended="document.getElementById('splashScreen').remove()">
+    <source id="splashSrc" src="" type="video/mp4">
+  </video>
+  <audio id="splashAudio" autoplay>
+    <source id="splashAudioSrc" src="" type="audio/mpeg">
+  </audio>
+</div>
+<script>
+  const isMobile = window.innerWidth < 900 || window.innerHeight < 800;
+  const splashSrc = document.getElementById('splashSrc');
+  const splashAudioSrc = document.getElementById('splashAudioSrc');
+  if (isMobile) {
+    splashSrc.src = 'splash_screen_1080_1920.mp4';
+    splashAudioSrc.src = 'splash_screen_1080_1920_sound.mp3';
+  } else {
+    splashSrc.src = 'splash_screen_1920_1080.mp4';
+    splashAudioSrc.src = 'splash_screen_1920_1080_sound.mp3';
+  }
+</script>
 <div class="app" id="app">
 <div class="masthead">
 <div class="brand">
