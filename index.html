@@ -626,48 +626,35 @@ tr.t-ir .stk { background:#FFF0F0 !important; }
 </head>
 <body>
 <div id="splashScreen" style="position:fixed;inset:0;background:#1A2B3C;z-index:10000;display:flex;align-items:center;justify-content:center;cursor:pointer;">
-<video id="splashVideo" autoplay muted playsinline webkit-playsinline style="width:100%;height:100%;object-fit:cover;" onended="document.getElementById('splashScreen').remove()">
-  <source id="splashSrc" src="" type="video/mp4">
+  <video id="splashVideo" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;" onended="document.getElementById('splashScreen').remove()">
+    <source id="splashSrc" src="" type="video/mp4">
   </video>
-  <audio id="splashAudio" preload="auto">
+  <audio id="splashAudio">
     <source id="splashAudioSrc" src="" type="audio/mpeg">
   </audio>
   <!-- Tap to skip -->
   <div onclick="document.getElementById('splashScreen').remove(); document.getElementById('splashAudio').pause();" style="position:absolute;inset:0;z-index:1;"></div>
   <!-- Sound button -->
-  <button id="soundBtn" onclick="event.stopPropagation(); toggleSplashSound();" style="position:absolute;bottom:24px;left:24px;z-index:2;background:rgba(255,255,255,0.15);border:none;border-radius:50%;width:48px;height:48px;font-size:24px;cursor:pointer;backdrop-filter:blur(4px);">🔇</button>
+  <button id="soundBtn" onclick="event.stopPropagation(); toggleSplashSound();" style="position:absolute;bottom:24px;left:24px;z-index:2;background:rgba(255,255,255,0.15);border:none;border-radius:50%;width:44px;height:44px;font-size:22px;cursor:pointer;backdrop-filter:blur(4px);">🔇</button>
 </div>
 <script>
   const isMobile = window.innerWidth < 900 || window.innerHeight < 800;
-  const videoSrc = isMobile ? 'splash_screen_1080_1920.mp4' : 'splash_screen_1920_1080.mp4';
-  const audioSrc = isMobile ? 'splash_screen_1080_1920_sound.mp3' : 'splash_screen_1920_1080_sound.mp3';
-
-  const splashVideo = document.getElementById('splashVideo');
-  const splashAudio = document.getElementById('splashAudio');
-  const splashAudioSrc = document.getElementById('splashAudioSrc');
-
-  document.getElementById('splashSrc').src = videoSrc;
-  splashAudioSrc.src = audioSrc;
-  splashAudio.load();
+  document.getElementById('splashSrc').src = isMobile ? 'splash_screen_1080_1920.mp4' : 'splash_screen_1920_1080.mp4';
+  document.getElementById('splashAudioSrc').src = isMobile ? 'splash_screen_1080_1920_sound.mp3' : 'splash_screen_1920_1080_sound.mp3';
 
   let soundOn = false;
   function toggleSplashSound() {
+    const audio = document.getElementById('splashAudio');
     const btn = document.getElementById('soundBtn');
     if (soundOn) {
-      splashAudio.pause();
+      audio.pause();
       btn.textContent = '🔇';
       soundOn = false;
     } else {
-      splashAudio.play().then(() => {
-        btn.textContent = '🔊';
-        soundOn = true;
-      }).catch(() => {
-        splashAudio.load();
-        splashAudio.play().then(() => {
-          btn.textContent = '🔊';
-          soundOn = true;
-        });
-      });
+      audio.currentTime = 0;
+      audio.play();
+      btn.textContent = '🔊';
+      soundOn = true;
     }
   }
 </script>
@@ -1680,10 +1667,10 @@ function renderBeerBank() {
 
   return `
     <div class="stats-row">
-      <div class="stat beer"><div class="lbl">🍺 Beer Fund Total</div><div class="val">${fmtSigned(fundTotal)}</div><div class="note">all players combined</div></div>
+      <div class="stat"><div class="lbl">🍺 Beer Fund Total</div><div class="val">${fmtSigned(fundTotal)}</div><div class="note">all players combined</div></div>
       <div class="stat"><div class="lbl">Beers Consumed</div><div class="val">${totalBeersConsumed} 🍺</div><div class="note">≈ ${fmtCompact(beerValue)} at ${fmt(state.pricePerBeer)}/beer</div></div>
       <div class="stat"><div class="lbl">BPG</div><div class="val">${bpg.toFixed(1)} 🍺</div><div class="note">beers per game (team avg)</div></div>
-      <div class="stat"><div class="lbl">Beers Per Season</div><div class="val">${totalBeersConsumed} 🍺</div><div class="note">total for all players this season</div></div>
+      <div class="stat"><div class="lbl">Avg Per Player</div><div class="val">${players.length > 0 ? (totalBeersConsumed / players.length).toFixed(1) : '0.0'} 🍺</div><div class="note">beers per player this season</div></div>
     </div>
 
     <div class="action-bar">
