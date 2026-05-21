@@ -625,17 +625,6 @@ tr.t-ir .stk { background:#FFF0F0 !important; }
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
-  <div id="splashScreen" style="position:fixed;inset:0;background:#1A2B3C;z-index:10000;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="this.remove()">
-  <video id="splashVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;" onended="document.getElementById('splashScreen').remove()">
-
-    <source id="splashSrc" src="" type="video/mp4">
-  </video>
-</div>
-<script>
-const isMobile = window.innerWidth < 900 || window.innerHeight < 800;
-const splashSrc = document.getElementById('splashSrc');
-splashSrc.src = isMobile ? 'splash_screen_1080_1920.mp4' : 'splash_screen_1920_1080.mp4';
-</script>
 <div class="app" id="app">
 <div class="masthead">
 <div class="brand">
@@ -1648,6 +1637,7 @@ function renderBeerBank() {
       <div class="stat beer"><div class="lbl">🍺 Beer Fund Total</div><div class="val">${fmtSigned(fundTotal)}</div><div class="note">all players combined</div></div>
       <div class="stat"><div class="lbl">Beers Consumed</div><div class="val">${totalBeersConsumed} 🍺</div><div class="note">≈ ${fmtCompact(beerValue)} at ${fmt(state.pricePerBeer)}/beer</div></div>
       <div class="stat"><div class="lbl">BPG</div><div class="val">${bpg.toFixed(1)} 🍺</div><div class="note">beers per game (team avg)</div></div>
+      <div class="stat"><div class="lbl">Beers Per Season</div><div class="val">${totalBeersConsumed} 🍺</div><div class="note">total for all players this season</div></div>
     </div>
 
     <div class="action-bar">
@@ -2562,11 +2552,11 @@ function renderLineupBuilder(s, games, players) {
     <div class="lineup-card">
       <div class="lineup-head" style="flex-wrap:wrap;gap:8px;">
         <h3>Lineup Builder</h3>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-          <select id="lineupGameSelect" onchange="setLineupGame(this.value)" style="max-width:340px;min-width:220px;flex:1;">${gameOpts}</select>
-          <button class="btn btn-rust btn-sm" onclick="autoBuildLineup(document.getElementById('lineupGameSelect')?.value||'${game.id}')" title="Auto-fill lineup from attendance + position history">⚡ Auto Build</button>
+        <select id="lineupGameSelect" onchange="setLineupGame(this.value)" style="width:100%;max-width:100%;min-width:100%;order:10;flex-basis:100%;">${gameOpts}</select>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;width:100%;order:20;">
+          ${isAdmin ? `<button class="btn btn-rust btn-sm" onclick="autoBuildLineup(document.getElementById('lineupGameSelect')?.value||'${game.id}')" title="Auto-fill lineup from attendance + position history">⚡ Auto Build</button>
           <button class="btn ${swapMode ? 'btn-rust' : 'btn-ghost'} btn-sm" onclick="toggleSwapMode()" title="Tap two slots to swap players">↔ ${swapMode ? (swapSlot1 ? 'Tap 2nd slot…' : 'Tap a slot') : 'Swap'}</button>
-          <button class="btn btn-ghost btn-sm" onclick="openShareLineup(document.getElementById('lineupGameSelect')?.value||'${game.id}')">📤 Share</button>
+          <button class="btn btn-ghost btn-sm" onclick="openShareLineup(document.getElementById('lineupGameSelect')?.value||'${game.id}')">📤 Share</button>` : ''}
         </div>
       </div>
 
