@@ -465,8 +465,8 @@ body.is-admin .matrix .carry-cell input:focus{border-color:var(--rust);backgroun
   backdrop-filter:blur(6px);box-sizing:border-box;
 }
 .sc-card.sc-empty {
-  align-items:center;justify-content:center;opacity:0.4;
-  background:rgba(255,255,255,0.05);
+  background:transparent;border:1px dashed rgba(255,255,255,0.08);
+  opacity:0.3;
 }
 .sc-av-col { display:flex;flex-direction:column;align-items:center;gap:2px; }
 .sc-av-col .avatar { width:52px;height:52px;border-radius:50%;border:2px solid rgba(255,140,0,0.7); }
@@ -1509,14 +1509,25 @@ function openShareLineup(gameId) {
     {p:sp(lu.f1?.L),pos:'LW'},{p:sp(lu.f1?.C),pos:'C'},{p:sp(lu.f1?.R),pos:'RW'},
     {p:sp(lu.f2?.L),pos:'LW'},{p:sp(lu.f2?.C),pos:'C'},{p:sp(lu.f2?.R),pos:'RW'},
     {p:sp(lu.f3?.L),pos:'LW'},{p:sp(lu.f3?.C),pos:'C'},{p:sp(lu.f3?.R),pos:'RW'},
-  ].filter(s=>s.p);
+  ];
+  // Only trim completely empty lines from the end
+  let lastFwdLine = 0;
+  if (sp(lu.f3?.L)||sp(lu.f3?.C)||sp(lu.f3?.R)) lastFwdLine = 9;
+  else if (sp(lu.f2?.L)||sp(lu.f2?.C)||sp(lu.f2?.R)) lastFwdLine = 6;
+  else if (sp(lu.f1?.L)||sp(lu.f1?.C)||sp(lu.f1?.R)) lastFwdLine = 3;
+  const activeFwdSlots = fwdSlots.slice(0, lastFwdLine);
+
   const defSlots = [
     {p:sp(lu.d1?.L),pos:'LD'},{p:sp(lu.d1?.R),pos:'RD'},
     {p:sp(lu.d2?.L),pos:'LD'},{p:sp(lu.d2?.R),pos:'RD'},
-  ].filter(s=>s.p);
+  ];
+  let lastDefLine = 0;
+  if (sp(lu.d2?.L)||sp(lu.d2?.R)) lastDefLine = 4;
+  else if (sp(lu.d1?.L)||sp(lu.d1?.R)) lastDefLine = 2;
+  const activeDefSlots = defSlots.slice(0, lastDefLine);
   const goalieP = sp(lu.g);
-  const fCount = fwdSlots.length;
-  const dCount = defSlots.length;
+  const fCount = activeFwdSlots.filter(s=>s.p).length;
+  const dCount = activeDefSlots.filter(s=>s.p).length;
 
   const dateStr = game.date ? fmtDateShort(game.date) : '';
   const timeStr = game.time ? fmtAmPm(game.time) : '';
@@ -1544,9 +1555,9 @@ function openShareLineup(gameId) {
         </div>
       </div>
       <div class="scn-section-hdr">⚔ FORWARDS</div>
-      <div class="scn-grid">${fwdSlots.map(s=>renderCard(s.p,s.pos)).join('')}</div>
+      <div class="scn-grid">${activeFwdSlots.map(s=>renderCard(s.p,s.pos)).join('')}</div>
       <div class="scn-section-hdr">🛡 DEFENSE</div>
-      <div class="scn-grid-2">${defSlots.map(s=>renderCard(s.p,s.pos)).join('')}</div>
+      <div class="scn-grid-2">${activeDefSlots.map(s=>renderCard(s.p,s.pos)).join('')}</div>
       <div class="scn-bottom">
         <div>
           <div class="scn-section-hdr" style="padding-left:0;">🥅 GOALIE</div>
