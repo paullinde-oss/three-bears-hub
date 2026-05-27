@@ -466,26 +466,32 @@ body.is-admin .matrix .carry-cell input:focus{border-color:var(--rust);backgroun
 }
 .sc-card.sc-empty {
   background:transparent;border:1px dashed rgba(255,255,255,0.08);
-  opacity:0.3;
+  opacity:0.3;min-height:80px;
 }
-.sc-av-col { display:flex;flex-direction:column;align-items:center;gap:2px; }
-.sc-av-col .avatar { width:52px;height:52px;border-radius:50%;border:2px solid rgba(255,140,0,0.7); }
+.sc-av-col {
+  display:flex;flex-direction:column;align-items:center;
+  position:relative;margin-bottom:2px;
+}
+.sc-av-col .avatar { width:68px;height:68px;border-radius:50%;border:2px solid rgba(255,140,0,0.8); }
 .sc-pos {
-  font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:600;
-  color:rgba(255,200,100,0.9);background:rgba(0,0,0,0.55);
-  padding:1px 5px;border-radius:3px;margin-top:2px;
+  position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+  font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;
+  color:#fff;background:rgba(0,0,0,0.85);
+  padding:2px 6px;border-radius:4px;
+  border:1px solid rgba(255,200,100,0.5);
+  white-space:nowrap;z-index:1;
 }
 .sc-info {
-  width:100%;text-align:center;margin-top:6px;
-  display:flex;flex-direction:column;align-items:center;gap:3px;overflow:hidden;
+  width:100%;text-align:center;margin-top:12px;
+  display:flex;flex-direction:column;align-items:center;gap:2px;overflow:hidden;
 }
 .sc-name {
-  font-family:'Orbitron',sans-serif;font-size:13px;font-weight:900;
+  font-family:'Orbitron',sans-serif;font-size:12px;font-weight:900;
   color:#fff;text-shadow:1px 1px 0 rgba(0,0,0,0.9);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  width:100%;text-align:center;letter-spacing:0.5px;
+  width:100%;text-align:center;
 }
-.sc-row2 { display:flex;align-items:center;justify-content:center;gap:6px;width:100%; }
+.sc-row2 { display:flex;align-items:center;justify-content:center;gap:5px;width:100%; }
 .sc-jersey {
   font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;
   color:#FF8C00;white-space:nowrap;
@@ -495,9 +501,8 @@ body.is-admin .matrix .carry-cell input:focus{border-color:var(--rust);backgroun
   font-family:'JetBrains Mono',monospace;font-size:8px;
   color:rgba(255,255,255,0.5);font-style:italic;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  width:100%;text-align:center;min-height:11px;
+  width:100%;text-align:center;
 }
-.sc-empty-name { font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(255,255,255,0.3); }
 .scn-stats-col {
   background:rgba(0,0,0,0.55);border:1px solid rgba(255,130,0,0.5);
   border-radius:10px;padding:12px 14px;
@@ -531,9 +536,9 @@ tr.t-ir .stk { background:#FFF0F0 !important; }
 
 /* ── attendance cells: bigger, bolder icons ── */
 .att { font-size:16px !important;font-weight:700 !important; }
-.att.in { background:var(--in-bg);color:var(--in-text); }
-.att.out { background:var(--out-bg);color:var(--out-text); }
-.att.cut { background:var(--cut-bg);color:var(--cut-text); }
+.att.in { background:var(--in-bg) !important;color:var(--in-text) !important; }
+.att.out { background:var(--out-bg) !important;color:var(--out-text) !important; }
+.att.cut { background:var(--cut-bg) !important;color:var(--cut-text) !important; }
 
 /* ── mobile lineup ── */
 @media(max-width:480px){
@@ -1491,7 +1496,7 @@ function openShareLineup(gameId) {
     const noteHtml = p.notes ? `<div class="sc-note">${esc(p.notes)}</div>` : '';
     return `<div class="sc-card">
       <div class="sc-av-col">
-        <div style="${flipStyle}">${renderAvatar(p,'sm')}</div>
+        <div style="${flipStyle}">${renderAvatar(p,'md')}</div>
         <div class="sc-pos">${pos}</div>
       </div>
       <div class="sc-info">
