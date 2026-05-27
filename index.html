@@ -1350,8 +1350,12 @@ function totalBeersForPlayer(pId) {
   return total;
 }
 function gamesPlayedAllTime(pId) {
+  // Only count games where at least 1 beer has been logged (game has happened)
   let n = 0;
-  Object.keys(state.attendance).forEach(gId => { if ((state.attendance[gId] || {})[pId] === 'in') n++; });
+  Object.keys(state.attendance).forEach(gId => {
+    const gameHappened = Object.values(state.beers[gId]||{}).some(v=>parseInt(v)>0);
+    if (gameHappened && (state.attendance[gId]||{})[pId]==='in') n++;
+  });
   return n;
 }
 function avgBeersPerGame(pId) {
@@ -1463,7 +1467,8 @@ function openShareLineup(gameId) {
   });
   const bpgMap = {};
   players.forEach(p => {
-    const gp = games.filter(g=>(state.attendance?.[g.id]?.[p.id]==='in')||parseInt((state.beers?.[g.id]||{})[p.id]||0)>0).length;
+    const playedGames = games.filter(g => Object.values(state.beers?.[g.id]||{}).some(v=>parseInt(v)>0));
+    const gp = playedGames.filter(g=>(state.attendance?.[g.id]?.[p.id]==='in')).length;
     bpgMap[p.id] = gp>0 ? (beerTotals[p.id]/gp).toFixed(1) : '0.0';
   });
 
@@ -1739,7 +1744,9 @@ function seasonBeersForPlayer(pId, sId) {
 
 function seasonBPGForPlayer(pId, sId) {
   const games = seasonGames(sId);
-  const inGames = games.filter(g => (state.attendance[g.id]||{})[pId]==='in');
+  // Only count games where at least 1 beer has been logged (game has happened)
+  const playedGames = games.filter(g => Object.values(state.beers[g.id]||{}).some(v=>parseInt(v)>0));
+  const inGames = playedGames.filter(g => (state.attendance[g.id]||{})[pId]==='in');
   if (inGames.length === 0) return 0;
   const total = inGames.reduce((sum,g) => sum + (parseInt((state.beers[g.id]||{})[pId])||0), 0);
   return total / inGames.length;
