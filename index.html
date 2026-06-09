@@ -531,6 +531,13 @@ tr.t-ir .stk { background:#FFF0F0 !important; }
 .game-past-locked { opacity:0.85; }
 .game-lock-btn { font-size:11px;margin-top:3px;cursor:pointer;opacity:0.7;line-height:1; }
 .game-lock-btn:hover { opacity:1; }
+.matrix-scroll-outer { position:relative;display:flex;align-items:stretch;gap:0; }
+.matrix-scroll-outer .matrix-wrap { flex:1;min-width:0; }
+.matrix-arrow { display:none;position:relative;background:var(--paper-3);border:1px solid var(--line);color:var(--ink);font-size:22px;font-weight:700;width:28px;min-width:28px;cursor:pointer;border-radius:0;z-index:5;opacity:0.7;transition:opacity 0.15s;align-self:stretch; }
+.matrix-arrow:hover { opacity:1;background:var(--paper-2); }
+.matrix-arrow-left { border-radius:6px 0 0 6px;border-right:none; }
+.matrix-arrow-right { border-radius:0 6px 6px 0;border-left:none; }
+@media(min-width:721px){ .matrix-arrow { display:block; } }
 
 /* ── mobile lineup ── */
 @media(max-width:480px){
@@ -1245,7 +1252,7 @@ function ensureDefaults() {
   });
   state.payments.forEach(p => { if (!p.fund) p.fund = 'team'; });
   state.seasons.forEach(s => {
-    if (s.playoffMinGames == null) s.playoffMinGames = 4;
+    if (s.playoffMinGames == null || s.playoffMinGames === 5) s.playoffMinGames = 4;
     if (s.fullTimeDefault == null) s.fullTimeDefault = 467;
     if (s.partTimeDefault == null) s.partTimeDefault = 233;
     if (s.teamFees == null) s.teamFees = 0;
@@ -1423,18 +1430,21 @@ function toggleGameLock(gameId) {
   render();
 }
 
+function scrollMatrix(btn, dir) {
+  const wrap = btn.closest('.matrix-scroll-outer')?.querySelector('.matrix-wrap');
+  if (wrap) wrap.scrollBy({ left: dir * 200, behavior: 'smooth' });
+}
+
 function scrollToRecentGame() {
-  const wrap = document.querySelector('.matrix-wrap');
+  const wrap = document.querySelector('.matrix-scroll-outer .matrix-wrap');
   if (!wrap) return;
   const today = isoToday();
   const s = activeSeason();
   if (!s) return;
   const games = seasonGames(s.id);
-  // Find the most recent past game index
   let recentIdx = -1;
   games.forEach((g, i) => { if (g.date && g.date <= today) recentIdx = i; });
   if (recentIdx < 0) return;
-  // Each game col is roughly 54px wide, sticky cols ~310px
   const stickyWidth = 310;
   const colWidth = 54;
   const scrollTo = stickyWidth + (recentIdx * colWidth) - (wrap.clientWidth / 2);
@@ -1473,7 +1483,7 @@ function render() {
   else if (activeTab === 'beer') document.body.classList.add('bg-parking');
   const c = document.getElementById('content');
   if (activeTab === 'dashboard') { c.innerHTML = renderDashboard(); setTimeout(scrollToRecentGame, 50); }
-  else if (activeTab === 'beer') c.innerHTML = renderBeerBank();
+  else if (activeTab === 'beer') { c.innerHTML = renderBeerBank(); setTimeout(scrollToRecentGame, 50); }
   else if (activeTab === 'schedule') c.innerHTML = renderSchedule();
   else if (activeTab === 'settings') c.innerHTML = renderSettings();
 }
@@ -1697,7 +1707,11 @@ function renderMatrix(s, players, games) {
   players.forEach((p, idx) => {
     if (p.type !== lastType) {
       const info = TYPE_INFO[p.type] || TYPE_INFO.full;
-      body += `<tr class="section-divider"><td colspan="${9 + games.length}">${info.label}</td></tr>`;
+      body += `<tr class="section-divider">
+        <td class="stk stk-2" style="padding-left:8px" colspan="2">${info.label}</td>
+        <td class="stk stk-4"></td><td class="stk stk-5 mob-hide"></td><td class="stk stk-6 mob-hide"></td><td class="stk stk-7"></td>
+        ${games.map(() => `<td></td>`).join('')}<td></td><td></td>
+      </tr>`;
       lastType = p.type;
     }
     const allocated = parseFloat(p.allocated) || 0;
@@ -1741,7 +1755,7 @@ function renderMatrix(s, players, games) {
   const avgBodies = games.length === 0 ? 0 : (games.reduce((sum, g) => sum + bodiesForGame(g.id, s.id), 0) / games.length).toFixed(1);
   bodiesRow += `<td colspan="2" class="body-cnt" style="font-size:13px;">avg ${avgBodies}</td></tr>`;
 
-  return `<div class="matrix-wrap"><table class="matrix"><thead>${head}</thead><tbody>${body}${bodiesRow}</tbody></table></div>`;
+  return `<div class="matrix-scroll-outer"><button class="matrix-arrow matrix-arrow-left" onclick="scrollMatrix(this,-1)" title="Scroll left">‹</button><div class="matrix-wrap"><table class="matrix"><thead>${head}</thead><tbody>${body}${bodiesRow}</tbody></table></div><button class="matrix-arrow matrix-arrow-right" onclick="scrollMatrix(this,1)" title="Scroll right">›</button></div>`;
 }
 
 async function cycleAttend(gameId, playerId) {
@@ -1962,15 +1976,20 @@ function renderBeerBank() {
 
 
 function renderBeerMatrix(s, players, games) {
+  const today = isoToday();
   let head = `<tr>
     <th class="stk stk-2">Pos</th><th class="stk stk-3">Name</th>
     <th class="stk stk-4">Paid</th><th class="stk stk-5b">Beers</th>
     <th class="stk stk-6">Balance</th>`;
   games.forEach((g, idx) => {
-    head += `<th class="game-col" title="${esc(g.opponent || 'TBD')}">
+    const isPast = g.date && g.date < today;
+    const isUnlocked = unlockedPastGames.has(g.id);
+    const lockBtn = isPast && isAdmin ? `<div class="game-lock-btn" onclick="event.stopPropagation();toggleGameLock('${g.id}')" title="${isUnlocked ? 'Lock' : 'Unlock to edit'}">${isUnlocked ? '🔓' : '🔒'}</div>` : '';
+    head += `<th class="game-col${isPast && !isUnlocked ? ' game-past-locked' : ''}" title="${esc(g.opponent || 'TBD')}">
       <div class="gnum">GAME ${g.number || idx + 1}</div>
       <div class="gdate">${fmtDayShort(g.date)} ${fmtDateTiny(g.date)}</div>
       <div class="gopp">${esc(g.opponent || 'TBD')}</div>
+      ${lockBtn}
     </th>`;
   });
   head += `<th class="games-played">Avg/G</th></tr>`;
@@ -1980,7 +1999,11 @@ function renderBeerMatrix(s, players, games) {
   players.forEach((p, idx) => {
     if (p.type !== lastType) {
       const info = TYPE_INFO[p.type] || TYPE_INFO.full;
-      body += `<tr class="section-divider"><td colspan="${7 + games.length}">${info.label}</td></tr>`;
+      body += `<tr class="section-divider">
+        <td class="stk stk-2" style="padding-left:8px" colspan="2">${info.label}</td>
+        <td class="stk stk-4"></td><td class="stk stk-5b"></td><td class="stk stk-6"></td>
+        ${games.map(() => `<td></td>`).join('')}<td></td>
+      </tr>`;
       lastType = p.type;
     }
     const beerPaid = playerPaymentsSum(p.id, null, 'beer');
@@ -2001,13 +2024,16 @@ function renderBeerMatrix(s, players, games) {
       <td class="stk stk-5">${beerCount}</td>
       <td class="stk stk-6 ${balCls}">${fmtSigned(balance)}</td>`;
     games.forEach(g => {
+      const isPast = g.date && g.date < today;
+      const isUnlocked = unlockedPastGames.has(g.id);
+      const editable = isAdmin && (!isPast || isUnlocked);
       const beers = parseInt((state.beers[g.id] || {})[p.id]) || 0;
       const att = (state.attendance[g.id] || {})[p.id];
       const wasIn = att === 'in';
       const bucket = beers >= 5 ? 'b-5' : 'b-' + beers;
-      const cls = wasIn ? 'beer-cell ' + bucket : 'beer-cell not-in';
+      const cls = (wasIn ? 'beer-cell ' + bucket : 'beer-cell not-in') + (isPast && !isUnlocked ? ' att-locked' : '');
       const display = wasIn ? (beers || '') : '';
-      body += `<td class="${cls}"><input type="number" min="0" max="99" value="${display}" ${wasIn && isAdmin ? `onchange="updateBeer('${g.id}','${p.id}',this.value)"` : 'readonly disabled'} title="${wasIn ? esc(p.name) + ' — Game ' + (g.number || '') : 'Not IN'}"></td>`;
+      body += `<td class="${cls}"><input type="number" min="0" max="99" value="${display}" ${wasIn && editable ? `onchange="updateBeer('${g.id}','${p.id}',this.value)"` : 'readonly disabled'} title="${wasIn ? esc(p.name) + ' — Game ' + (g.number || '') : 'Not IN'}${isPast && !isUnlocked ? ' (locked)' : ''}"></td>`;
     });
     body += `<td class="games-played ${beerCount === 0 ? 'zero' : ''}">${avg.toFixed(1)}</td></tr>`;
   });
@@ -2022,7 +2048,7 @@ function renderBeerMatrix(s, players, games) {
   const grandTotal = games.reduce((sum, g) => sum + beersForGame(g.id), 0);
   totalsRow += `<td class="body-cnt" style="font-size:13px;">${grandTotal}</td></tr>`;
 
-  return `<div class="matrix-wrap beer-matrix-wrap"><table class="matrix"><thead>${head}</thead><tbody>${body}${totalsRow}</tbody></table></div>`;
+  return `<div class="matrix-scroll-outer"><button class="matrix-arrow matrix-arrow-left" onclick="scrollMatrix(this,-1)" title="Scroll left">‹</button><div class="matrix-wrap beer-matrix-wrap"><table class="matrix"><thead>${head}</thead><tbody>${body}${totalsRow}</tbody></table></div><button class="matrix-arrow matrix-arrow-right" onclick="scrollMatrix(this,1)" title="Scroll right">›</button></div>`;
 }
 
 async function updateBeer(gameId, playerId, val) {
