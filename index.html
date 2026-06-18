@@ -531,6 +531,17 @@ tr.t-ir .stk { background:#FFF0F0 !important; }
 .game-past-locked { opacity:0.85; }
 .game-lock-btn { font-size:11px;margin-top:3px;cursor:pointer;opacity:0.7;line-height:1; }
 .game-lock-btn:hover { opacity:1; }
+/* PWA Install Banner */
+#pwa-banner{position:fixed;bottom:0;left:0;right:0;z-index:10000;background:var(--ink);color:var(--paper);padding:12px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 -4px 20px rgba(0,0,0,0.35);transform:translateY(100%);transition:transform 0.3s ease;}
+#pwa-banner.visible{transform:translateY(0);}
+#pwa-banner .pwa-icon{font-size:28px;flex-shrink:0;}
+#pwa-banner .pwa-text{flex:1;min-width:0;}
+#pwa-banner .pwa-title{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;letter-spacing:0.05em;}
+#pwa-banner .pwa-sub{font-size:11px;opacity:0.75;margin-top:2px;line-height:1.4;}
+#pwa-banner .pwa-actions{display:flex;gap:8px;flex-shrink:0;}
+#pwa-banner .pwa-btn{padding:7px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;}
+#pwa-banner .pwa-install{background:var(--rust);color:white;}
+#pwa-banner .pwa-dismiss{background:transparent;color:rgba(255,255,255,0.6);font-size:20px;padding:4px 8px;}
 .matrix-scroll-outer { position:relative;display:flex;align-items:stretch;gap:0; }
 .matrix-scroll-outer .matrix-wrap { flex:1;min-width:0; }
 .matrix-arrow { display:none;position:relative;background:var(--paper-3);border:1px solid var(--line);color:var(--ink);font-size:22px;font-weight:700;width:28px;min-width:28px;cursor:pointer;border-radius:0;z-index:5;opacity:0.7;transition:opacity 0.15s;align-self:stretch; }
@@ -3856,6 +3867,88 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
 }
+</script>
+
+<!-- PWA Install Banner -->
+<div id="pwa-banner">
+  <div class="pwa-icon">🏒</div>
+  <div class="pwa-text">
+    <div class="pwa-title">Three Bears Hockey Hub</div>
+    <div class="pwa-sub" id="pwa-sub">Add to your home screen for quick access</div>
+  </div>
+  <div class="pwa-actions">
+    <button class="pwa-btn pwa-install" id="pwa-install-btn">Install</button>
+    <button class="pwa-btn pwa-dismiss" id="pwa-dismiss-btn" title="Dismiss">×</button>
+  </div>
+</div>
+<script>
+(function() {
+  const DISMISSED_KEY = 'pwa_banner_dismissed_v1';
+  const banner = document.getElementById('pwa-banner');
+  const installBtn = document.getElementById('pwa-install-btn');
+  const dismissBtn = document.getElementById('pwa-dismiss-btn');
+  const subText = document.getElementById('pwa-sub');
+
+  // Don't show if already dismissed or running standalone
+  if (localStorage.getItem(DISMISSED_KEY)) return;
+  if (window.matchMedia('(display-mode: standalone)').matches) return;
+  if (window.navigator.standalone === true) return; // iOS standalone
+
+  let deferredPrompt = null;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid = /android/i.test(navigator.userAgent);
+
+  function showBanner() {
+    setTimeout(() => { banner.classList.add('visible'); }, 2500);
+  }
+
+  function hideBanner(permanently) {
+    banner.classList.remove('visible');
+    if (permanently) localStorage.setItem(DISMISSED_KEY, '1');
+  }
+
+  dismissBtn.addEventListener('click', () => hideBanner(true));
+
+  if (isIOS) {
+    // iOS: show instructions since there's no prompt API
+    installBtn.textContent = 'How?';
+    subText.textContent = 'Add to Home Screen for the best experience';
+    installBtn.addEventListener('click', () => {
+      hideBanner(false);
+      // Show iOS instruction overlay
+      const ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;display:flex;align-items:flex-end;justify-content:center;padding:16px;';
+      ov.innerHTML = `<div style="background:var(--paper);border-radius:14px;padding:24px;max-width:360px;width:100%;text-align:center;margin-bottom:60px;">
+        <div style="font-size:32px;margin-bottom:12px;">🏒</div>
+        <h3 style="margin:0 0 8px;font-family:'DM Sans',sans-serif;font-size:16px;">Add Three Bears to Home Screen</h3>
+        <p style="margin:0 0 16px;font-size:13px;color:var(--muted);line-height:1.5;">
+          Tap the <strong>Share</strong> button <span style="font-size:16px;">⬆</span> at the bottom of Safari,<br>
+          then tap <strong>"Add to Home Screen"</strong>.
+        </p>
+        <button onclick="this.closest('div[style]').remove()" style="background:var(--rust);color:white;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Got it</button>
+      </div>`;
+      ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+      document.body.appendChild(ov);
+    });
+    showBanner();
+  } else if (isAndroid) {
+    // Android: wait for beforeinstallprompt
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      subText.textContent = 'Install for fast, full-screen access on your Pixel';
+      installBtn.addEventListener('click', () => {
+        hideBanner(false);
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(result => {
+          if (result.outcome === 'accepted') localStorage.setItem(DISMISSED_KEY, '1');
+          deferredPrompt = null;
+        });
+      });
+      showBanner();
+    });
+  }
+})();
 </script>
 </body>
 </html>

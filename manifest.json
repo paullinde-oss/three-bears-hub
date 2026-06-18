@@ -1,36 +1,27 @@
 {
   "name": "Three Bears Hockey Hub",
-  "short_name": "3 Bears",
-  "description": "Hockey team dashboard — roster, schedule, beer bank & lineups",
-  "start_url": "./index.html",
+  "short_name": "Three Bears",
+  "description": "Mensa League hockey team hub — attendance, beer bank, schedule",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#FFFBF5",
-  "theme_color": "#1A2B3C",
+  "background_color": "#F4EFE3",
+  "theme_color": "#C75A2C",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "3_Bears_logo_Pixel.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "icon-512.png",
+      "src": "3_Bears_logo_Pixel.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "categories": ["sports", "utilities"],
+  "lang": "en-CA"
 }
