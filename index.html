@@ -117,11 +117,11 @@ label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.1em
 .matrix tbody .stk-4{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--rust)}
 .matrix tbody .stk-2{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase}
 .matrix tbody .stk-1{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)}
-.matrix tr.t-full td.stk{background:var(--paper-3)}
-.matrix tr.t-part td.stk,.matrix tr.t-part td:not(.stk){background:#FFF7DC}
-.matrix tr.t-goalie td.stk,.matrix tr.t-goalie td:not(.stk){background:#E8F5E9}
-.matrix tr.t-spare td.stk,.matrix tr.t-spare td:not(.stk){background:#F0EAD6}
-.matrix tr.t-sub td.stk,.matrix tr.t-sub td:not(.stk){background:#FFE0B2}
+.matrix tr.t-full td.stk{background:#FFFAE8}
+.matrix tr.t-part td.stk,.matrix tr.t-part td:not(.stk){background:#EAF4FB}
+.matrix tr.t-goalie td.stk,.matrix tr.t-goalie td:not(.stk){background:#FFFAE8}
+.matrix tr.t-spare td.stk,.matrix tr.t-spare td:not(.stk){background:#FFFAE8}
+.matrix tr.t-sub td.stk,.matrix tr.t-sub td:not(.stk){background:#EAF4FB}
 .matrix tr.t-ir td.stk,.matrix tr.t-ir td:not(.stk){background:#FFCDD2}
 .matrix tr.t-ir td:not(.stk){opacity:0.75}
 .matrix tr:hover td:not(.stk){filter:brightness(0.97)}
@@ -1714,15 +1714,8 @@ function renderDashboard() {
 
     <div class="legend">
       <span class="legend-item"><span class="legend-sw in">✓</span> In</span>
-      <span class="legend-item"><span class="legend-sw out"></span> Out</span>
-      <span class="legend-item"><span class="legend-sw cut"></span> Said In, Cut</span>
-      <span style="margin:0 8px;color:var(--line-dark);">|</span>
-      <span class="legend-item"><span class="legend-sw full"></span> Full Time</span>
-      <span class="legend-item"><span class="legend-sw part"></span> Part Time</span>
-      <span class="legend-item"><span class="legend-sw goalie"></span> Goalie</span>
-      <span class="legend-item"><span class="legend-sw spare"></span> Spare</span>
-      <span class="legend-item"><span class="legend-sw sub"></span> Sub</span>
-      <span class="legend-item"><span class="legend-sw ir"></span> IR</span>
+      <span class="legend-item"><span class="legend-sw out">✗</span> Out</span>
+      <span class="legend-item"><span class="legend-sw cut">✓</span> Said In, Cut</span>
     </div>
 
     ${renderLineupBuilder(s, games, players)}
@@ -1774,7 +1767,7 @@ function renderMatrix(s, players, games) {
     } else if (paid > 0) { balCls = 'bal-paid'; balTxt = '✓'; }
     const gp = gamesPlayedFor(p.id, s.id);
     const eligible = gp >= playoffMin;
-    const tintMap = { full:'#FFFAE8',part:'#F3FAF3',sub:'#F0F0FB',spare:'#F7F7F7',goalie:'#FFF4E0',ir:'#FFF0F0' };
+    const tintMap = { full:'#FFFAE8', part:'#EAF4FB', sub:'#EAF4FB', spare:'#FFFAE8', goalie:'#FFFAE8', ir:'#FFCDD2' };
     const rowTint = tintMap[p.type]||'transparent';
     body += `<tr class="t-${p.type}" data-pid="${p.id}" style="background:${rowTint}">
       <td class="stk stk-2">${esc(p.position || '')}</td>
@@ -2072,7 +2065,7 @@ function renderBeerMatrix(s, players, games) {
     if (balance > 0.01) balCls = 'bal-paid';
     else if (balance < -0.01) balCls = 'bal-owe';
 
-    const tintMap = { full:'#FFFAE8',part:'#F3FAF3',sub:'#F0F0FB',spare:'#F7F7F7',goalie:'#FFF4E0',ir:'#FFF0F0' };
+    const tintMap = { full:'#FFFAE8', part:'#EAF4FB', sub:'#EAF4FB', spare:'#FFFAE8', goalie:'#FFFAE8', ir:'#FFCDD2' };
     const rowTint = tintMap[p.type]||'transparent';
     body += `<tr class="t-${p.type}" data-pid="${p.id}" style="background:${rowTint}">
       <td class="stk stk-2">${esc(p.position || '')}</td>
