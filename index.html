@@ -1495,7 +1495,19 @@ function render() {
   if (activeTab === 'dashboard' || activeTab === 'lineup') document.body.classList.add('bg-rink');
   else if (activeTab === 'beer') document.body.classList.add('bg-parking');
   const c = document.getElementById('content');
-  if (activeTab === 'dashboard') { c.innerHTML = renderDashboard(); setTimeout(scrollToRecentGame, 50); }
+  if (activeTab === 'dashboard') {
+    c.innerHTML = renderDashboard();
+    setTimeout(scrollToRecentGame, 50);
+    // If no cache yet, fetch from SportNinja then re-render dashboard with live games
+    if (!snGamesCache) {
+      fetchSNGames().then(games => {
+        if (games && activeTab === 'dashboard') {
+          c.innerHTML = renderDashboard();
+          setTimeout(scrollToRecentGame, 50);
+        }
+      });
+    }
+  }
   else if (activeTab === 'beer') { c.innerHTML = renderBeerBank(); setTimeout(scrollToRecentGame, 50); }
   else if (activeTab === 'schedule') { renderSchedule().then(html => { if (activeTab === 'schedule') c.innerHTML = html; }); c.innerHTML = '<div class="matrix-empty" style="padding:32px;text-align:center;"><span style="opacity:0.5;font-size:13px;">Loading schedule from SportNinja…</span></div>'; }
   else if (activeTab === 'settings') c.innerHTML = renderSettings();
@@ -1639,7 +1651,15 @@ function renderDashboard() {
   const s = activeSeason();
   if (!s) return `<div class="matrix-empty">No season set up. Go to Settings to add one.</div>`;
   const players = seasonPlayers(s.id);
-  const games = seasonGames(s.id);
+  // Merge: Firebase past games + SportNinja upcoming games (deduplicated by id)
+  const fbGames = seasonGames(s.id);
+  const snGames = snGamesCache || [];
+  const snIds = new Set(snGames.map(g => g.id));
+  // Keep Firebase games that aren't already in SportNinja feed (past games)
+  const pastFbGames = fbGames.filter(g => !snIds.has(g.id));
+  // Combine and sort by date
+  const games = [...pastFbGames, ...snGames].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const isLive = snGames.length > 0;
 
   const totalAllocated = players.reduce((sum, p) => sum + (parseFloat(p.allocated) || 0), 0);
   const totalPaid = players.reduce((sum, p) => sum + playerPaymentsSum(p.id, s.id, 'team'), 0);
@@ -1663,7 +1683,7 @@ function renderDashboard() {
 
     <div class="action-bar">
       ${isAdmin ? `<button class="btn btn-rust" onclick="openAddPlayer()">+ Add Player</button>
-      <button class="btn" onclick="openAddGame()">+ Add Game</button>` : ''}
+      ${!isLive ? `<button class="btn" onclick="openAddGame()">+ Add Game</button>` : ''}` : ''}
       <div class="spacer"></div>
       ${isAdmin && games.length > 0 && players.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="cycleAllAttend()">Mark all blank → IN</button>` : ''}
       ${games.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="openAddToCalendar()" style="display:inline-flex;align-items:center;gap:5px;">📅 Add to Calendar</button>` : ''}
@@ -3088,7 +3108,7 @@ async function clearLineup(gameId) {
 const SN_TEAM_ID = '7k4lXyCnOQqD2h47';
 const SN_SCHEDULE_ID = 'RKUIllHs4Gcvvf5v';
 const SN_CALENDAR_URL = 'https://canlan2-api.sportninja.net/v1/calendar/7k4lXyCnOQqD2h47/games';
-const SN_GAMES_URL = `https://canlan2-api.sportninja.net/v1/schedules/${SN_SCHEDULE_ID}/games?page=1&order=asc&exclude_cancelled_games=1&team_id=${SN_TEAM_ID}&starts_after=${new Date().getFullYear()-1}-01-01T00:00:00-07:00&starts_before=${new Date().getFullYear()+1}-12-31T00:00:00-07:00`;
+const SN_GAMES_URL = `https://canlan2-api.sportninja.net/v1/schedules/${SN_SCHEDULE_ID}/games?page=1&order=asc&exclude_cancelled_games=1&team_id=${SN_TEAM_ID}&starts_after=${new Date().toISOString().slice(0,10)}T00:00:00-07:00&starts_before=${new Date().getFullYear()+1}-12-31T00:00:00-07:00`;
 
 let snGamesCache = null;
 let snGamesLastFetch = 0;
@@ -3100,15 +3120,28 @@ async function fetchSNGames() {
     const res = await fetch(SN_GAMES_URL);
     if (!res.ok) throw new Error('API error');
     const json = await res.json();
-    snGamesCache = (json.data || []).map(g => {
+    snGamesCache = (json.data || []).map((g, idx) => {
       const isHome = g.homeTeam?.id === SN_TEAM_ID;
       const opp = isHome ? g.visitingTeam?.name : g.homeTeam?.name;
       const dt = new Date(g.starts_at);
-      const date = dt.toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' }); // YYYY-MM-DD
-      const time = dt.toLocaleTimeString('en-CA', { timeZone: 'America/Vancouver', hour: '2-digit', minute: '2-digit', hour12: false });
+      const date = dt.toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' });
+      const timeRaw = dt.toLocaleTimeString('en-CA', { timeZone: 'America/Vancouver', hour: '2-digit', minute: '2-digit', hour12: false });
+      // Convert HH:MM 24h to HH:MM for fmtAmPm
+      const time = timeRaw;
       const rink = g.facility?.name || '';
       const division = g.schedule?.name || '';
-      return { id: g.id, snId: g.id, number: g.league_game_number, date, time, opponent: opp || 'TBD', isHome, location: rink ? `${rink} — Canlan Langley` : 'Canlan Langley', division, ourScore: g.homeScore ?? (isHome ? g.stats?.home_score : g.stats?.visiting_score), theirScore: isHome ? g.stats?.visiting_score : g.stats?.home_score };
+      return {
+        id: g.id,           // use SportNinja ID — attendance/beers in Firebase keyed to this
+        snId: g.id,
+        number: idx + 1,    // renumber G1, G2, G3...
+        date, time,
+        opponent: opp || 'TBD',
+        isHome,
+        location: rink ? `${rink} — Canlan Langley` : 'Canlan Langley',
+        division,
+        ourScore: null,
+        theirScore: null
+      };
     });
     snGamesLastFetch = now;
     return snGamesCache;
@@ -3170,8 +3203,12 @@ async function renderSchedule() {
 
   // Try SportNinja first
   const snGames = await fetchSNGames();
-  const games = snGames || seasonGames(s.id);
-  const isLive = !!snGames;
+  const fbGames = seasonGames(s.id);
+  const snList = snGames || [];
+  const snIds = new Set(snList.map(g => g.id));
+  const pastFbGames = fbGames.filter(g => !snIds.has(g.id));
+  const games = [...pastFbGames, ...snList].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const isLive = snList.length > 0;
 
   const rows = games.length === 0
     ? `<div class="matrix-empty">No games scheduled.</div>`
