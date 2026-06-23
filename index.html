@@ -126,6 +126,7 @@ label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.1em
 .matrix tr.t-ir td:not(.stk){opacity:0.75}
 .matrix tr:hover td:not(.stk){filter:brightness(0.97)}
 .matrix tr.section-divider td{background:var(--ink)!important;color:var(--paper);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;text-align:left;padding:6px 12px;height:28px;position:sticky;left:0;z-index:2;}
+.section-group-label{background:var(--ink);color:var(--paper);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;padding:6px 14px;height:28px;display:flex;align-items:center;margin-top:2px;border-radius:4px 4px 0 0;}
 .matrix .att{width:60px;min-width:60px;user-select:none;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px}
 body.is-admin .matrix .att{cursor:pointer}
 body.is-admin .matrix .att:hover{filter:brightness(0.95)}
@@ -1349,6 +1350,21 @@ function seasonGames(sId) {
   return state.games.filter(g => g.seasonId === sId)
     .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.number || 0) - (b.number || 0));
 }
+// Returns merged Firebase + SportNinja games for the active season
+function mergedGames(sId) {
+  const fb = seasonGames(sId);
+  const sn = snGamesCache || [];
+  const snIds = new Set(sn.map(g => g.id));
+  return [...fb.filter(g => !snIds.has(g.id)), ...sn]
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+}
+// Find a game by ID across both Firebase and SportNinja cache
+function findGame(gameId) {
+  if (!gameId) return null;
+  return (snGamesCache || []).find(g => g.id === gameId)
+    || state.games.find(g => g.id === gameId)
+    || null;
+}
 function playerPaymentsSum(pId, sId, fund) {
   return state.payments.filter(p =>
     p.playerId === pId && (sId == null || p.seasonId === sId) && (fund == null || p.fund === fund)
@@ -1356,7 +1372,7 @@ function playerPaymentsSum(pId, sId, fund) {
 }
 function gamesPlayedFor(pId, sId) {
   const today = isoToday();
-  return seasonGames(sId).filter(g => g.date <= today)
+  return mergedGames(sId).filter(g => g.date <= today)
     .filter(g => state.attendance[g.id] && state.attendance[g.id][pId] === 'in').length;
 }
 function bodiesForGame(gId, sId) {
@@ -1521,13 +1537,13 @@ function setActiveTab(t) { activeTab = t; render(); }
 // =============== DASHBOARD ===============
 // ── Share Lineup Screenshot View ──
 function openShareLineup(gameId) {
-  const game = state.games.find(g=>g.id===gameId);
+  const game = findGame(gameId);
   if (!game) return;
   ensureLineup(gameId);
   const lu = state.lineups[gameId];
   const s = activeSeason();
   const players = seasonPlayers(s?.id||'');
-  const games = seasonGames(s?.id||'');
+  const games = mergedGames(s?.id||'');
   const sp = v => slotPlayer(v, players);
 
   // Beer totals & BPG per player
@@ -1741,14 +1757,13 @@ function renderMatrix(s, players, games) {
 
   let body = '';
   let lastType = null;
+  let currentGroup = '';
+  let groups = []; // [{label, rows}]
+
   players.forEach((p, idx) => {
     if (p.type !== lastType) {
       const info = TYPE_INFO[p.type] || TYPE_INFO.full;
-      body += `<tr class="section-divider">
-        <td class="stk stk-2" style="padding-left:8px" colspan="2">${info.label}</td>
-        <td class="stk stk-4"></td><td class="stk stk-5 mob-hide"></td><td class="stk stk-6 mob-hide"></td><td class="stk stk-7"></td>
-        ${games.map(() => `<td></td>`).join('')}<td></td><td></td>
-      </tr>`;
+      groups.push({ label: info.label, rows: [] });
       lastType = p.type;
     }
     const allocated = parseFloat(p.allocated) || 0;
@@ -1763,7 +1778,7 @@ function renderMatrix(s, players, games) {
     const eligible = gp >= playoffMin;
     const tintMap = { full:'#FFFAE8',part:'#F3FAF3',sub:'#F0F0FB',spare:'#F7F7F7',goalie:'#FFF4E0',ir:'#FFF0F0' };
     const rowTint = tintMap[p.type]||'transparent';
-    body += `<tr class="t-${p.type}" data-pid="${p.id}" style="background:${rowTint}">
+    let row = `<tr class="t-${p.type}" data-pid="${p.id}" style="background:${rowTint}">
       <td class="stk stk-2">${esc(p.position || '')}</td>
       <td class="stk stk-3" onclick="openProfile('${p.id}')" style="cursor:pointer"><span class="matrix-name-cell" style="display:inline-flex;align-items:center;gap:5px">${renderAvatar(p, 'sm')}<span>${esc(p.name)}</span></span></td>
       <td class="stk stk-4">${esc(p.jerseyNumber || '')}</td>
@@ -1777,25 +1792,33 @@ function renderMatrix(s, players, games) {
       const status = (state.attendance[g.id] && state.attendance[g.id][p.id]) || '';
       const attIcon = status==='in' ? '✓' : status==='out' ? '✗' : status==='cut' ? '✓' : '';
       const cellCls = (status ? 'att ' + status : 'att') + (isPast && !isUnlocked ? ' att-locked' : '');
-      body += `<td class="${cellCls}" ${editable ? `onclick="cycleAttend('${g.id}','${p.id}')"` : ''} title="${esc(p.name)} — Game ${g.number || ''}${isPast && !isUnlocked ? ' (locked — click 🔓 to edit)' : ''}">${attIcon}</td>`;
+      row += `<td class="${cellCls}" ${editable ? `onclick="cycleAttend('${g.id}','${p.id}',this)"` : ''} title="${esc(p.name)} — Game ${g.number || ''}${isPast && !isUnlocked ? ' (locked — click 🔓 to edit)' : ''}">${attIcon}</td>`;
     });
-    body += `<td class="games-played ${gp === 0 ? 'zero' : ''}">${gp}</td>
+    row += `<td class="games-played ${gp === 0 ? 'zero' : ''}">${gp}</td>
       <td class="eligible ${eligible ? 'yes' : 'no'}">${eligible ? '✓' : ''}</td></tr>`;
+    groups[groups.length - 1].rows.push(row);
   });
 
-  let bodiesRow = `<tr class="bodies-row">
-    <td class="stk stk-1"></td><td class="stk stk-2"></td>
-    <td class="stk stk-3 label">Bodies</td>
-    <td class="stk stk-4"></td><td class="stk stk-5"></td>
-    <td class="stk stk-6"></td><td class="stk stk-7"></td>`;
-  games.forEach(g => { bodiesRow += `<td class="body-cnt">${bodiesForGame(g.id, s.id)}</td>`; });
-  const avgBodies = games.length === 0 ? 0 : (games.reduce((sum, g) => sum + bodiesForGame(g.id, s.id), 0) / games.length).toFixed(1);
-  bodiesRow += `<td colspan="2" class="body-cnt" style="font-size:13px;">avg ${avgBodies}</td></tr>`;
+  // Render bodies row (totals)
+  let bodiesRow = '';
+  const bodiesByGame = games.map(g => bodiesForGame(g.id, s.id));
+  bodiesRow = `<tr class="totals-row"><td class="stk stk-2" colspan="2" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:6px 12px;">BODIES</td>
+    <td class="stk stk-4 mob-hide"></td><td class="stk stk-5 mob-hide"></td><td class="stk stk-6 mob-hide"></td><td class="stk stk-7"></td>
+    ${bodiesByGame.map(b => `<td style="text-align:center;font-size:12px;font-weight:600;">${b||''}</td>`).join('')}
+    <td></td><td></td></tr>`;
 
-  return `<div class="matrix-scroll-outer"><button class="matrix-arrow matrix-arrow-left" onclick="scrollMatrix(this,-1)" title="Scroll left">‹</button><div class="matrix-wrap"><table class="matrix"><thead>${head}</thead><tbody>${body}${bodiesRow}</tbody></table></div><button class="matrix-arrow matrix-arrow-right" onclick="scrollMatrix(this,1)" title="Scroll right">›</button></div>`;
+  // Build grouped tables
+  const groupedTables = groups.map(group => `
+    <div class="section-group-label">${group.label}</div>
+    <div class="matrix-scroll-outer"><button class="matrix-arrow matrix-arrow-left" onclick="scrollMatrix(this,-1)">‹</button><div class="matrix-wrap"><table class="matrix"><thead>${head}</thead><tbody>${group.rows.join('')}</tbody></table></div><button class="matrix-arrow matrix-arrow-right" onclick="scrollMatrix(this,1)">›</button></div>
+  `).join('');
+
+  return `${groupedTables}
+    <div class="matrix-scroll-outer"><button class="matrix-arrow matrix-arrow-left" onclick="scrollMatrix(this,-1)">‹</button><div class="matrix-wrap"><table class="matrix"><thead>${head}</thead><tbody>${bodiesRow}</tbody></table></div><button class="matrix-arrow matrix-arrow-right" onclick="scrollMatrix(this,1)">›</button></div>`;
+
 }
 
-async function cycleAttend(gameId, playerId) {
+async function cycleAttend(gameId, playerId, el) {
   if (!requireAdmin()) return;
   if (!state.attendance[gameId]) state.attendance[gameId] = {};
   const cur = state.attendance[gameId][playerId] || '';
@@ -1809,15 +1832,19 @@ async function cycleAttend(gameId, playerId) {
     ['d1','d2'].forEach(k => { if(lu[k]) ['L','R'].forEach(p => { if(lu[k][p]===playerId) lu[k][p]=''; }); });
     if(lu.g===playerId) lu.g='';
   }
+  // Update the cell in-place — no full re-render, no scroll jump
+  if (el) {
+    el.className = (next ? 'att ' + next : 'att') + (el.className.includes('att-locked') ? ' att-locked' : '');
+    el.textContent = next === 'in' ? '✓' : next === 'out' ? '✗' : next === 'cut' ? '✓' : '';
+  }
   await saveState();
-  render();
 }
 
 async function cycleAllAttend() {
   if (!requireAdmin()) return;
   const s = activeSeason();
   if (!confirm('Mark all blank cells as IN for every player & every game?')) return;
-  seasonGames(s.id).forEach(g => {
+  mergedGames(s.id).forEach(g => {
     if (!state.attendance[g.id]) state.attendance[g.id] = {};
     seasonPlayers(s.id).forEach(p => { if (!state.attendance[g.id][p.id]) state.attendance[g.id][p.id] = 'in'; });
   });
@@ -1829,12 +1856,12 @@ async function cycleAllAttend() {
 // =============== BEER BANK ===============
 // ── Beer award helpers ──
 function seasonBeersForPlayer(pId, sId) {
-  const games = seasonGames(sId);
+  const games = mergedGames(sId);
   return games.reduce((sum, g) => sum + (parseInt((state.beers[g.id]||{})[pId])||0), 0);
 }
 
 function seasonBPGForPlayer(pId, sId) {
-  const games = seasonGames(sId);
+  const games = mergedGames(sId);
   // Only count games where at least 1 beer has been logged (game has happened)
   const playedGames = games.filter(g => Object.values(state.beers[g.id]||{}).some(v=>parseInt(v)>0));
   const inGames = playedGames.filter(g => (state.attendance[g.id]||{})[pId]==='in');
@@ -1844,12 +1871,12 @@ function seasonBPGForPlayer(pId, sId) {
 }
 
 function threeBeerPoints(pId, sId) {
-  const games = seasonGames(sId);
+  const games = mergedGames(sId);
   return games.filter(g => (parseInt((state.beers[g.id]||{})[pId])||0) === 3).length;
 }
 
 function teamBPG(sId) {
-  const games = seasonGames(sId);
+  const games = mergedGames(sId);
   const active = games.filter(g => Object.values(state.beers[g.id]||{}).some(v=>parseInt(v)>0));
   if (!active.length) return 0;
   const total = active.reduce((s,g)=>s+beersForGame(g.id),0);
@@ -2358,12 +2385,12 @@ async function removePlayerFromSeason(playerId) {
   if (!confirm('Remove this player from this season? Their payment history stays.')) return;
   const s = activeSeason();
   delete state.rosters[s.id][playerId];
-  seasonGames(s.id).forEach(g => {
+  mergedGames(s.id).forEach(g => {
     if (state.attendance[g.id]) delete state.attendance[g.id][playerId];
     if (state.beers[g.id]) delete state.beers[g.id][playerId];
   });
   Object.keys(state.lineups).forEach(gId => {
-    const game = state.games.find(g => g.id === gId);
+    const game = findGame(gId);
     if (!game || game.seasonId !== s.id) return;
     const lu = state.lineups[gId];
     ['f1','f2','f3'].forEach(k => { if (lu[k]) ['L','C','R'].forEach(pos => { if (lu[k][pos] === playerId) lu[k][pos] = ''; }); });
@@ -2464,9 +2491,9 @@ function openAddGame() { if (!requireAdmin()) return; openGameForm(); }
 function openGameForm(gameId) {
   if (!requireAdmin()) return;
   const s = activeSeason();
-  const g = gameId ? state.games.find(x => x.id === gameId) : null;
+  const g = gameId ? findGame(gameId) : null;
   const isEdit = !!g;
-  const nextNum = isEdit ? g.number : (seasonGames(s.id).reduce((max, x) => Math.max(max, parseInt(x.number) || 0), 0) + 1);
+  const nextNum = isEdit ? g.number : (mergedGames(s.id).reduce((max, x) => Math.max(max, parseInt(x.number) || 0), 0) + 1);
   openModal(`
     <h3>${isEdit ? 'Edit' : 'Add'} Game</h3>
     <form id="gameForm">
@@ -2619,7 +2646,7 @@ function getSlotHistory(playerId) {
   };
   Object.entries(state.lineups || {}).forEach(([gId, lu]) => {
     if (!lu) return;
-    const game = state.games.find(x => x.id === gId);
+    const game = findGame(gId);
     const ts   = game && game.date ? new Date(game.date).getTime() : 0;
     const bump = slot => { h[slot].n++; h[slot].ts = Math.max(h[slot].ts, ts); };
     ['f1','f2','f3'].forEach(k => {
@@ -2842,11 +2869,11 @@ function renderLineupBuilder(s, games, players) {
       <div class="lineup-empty">Add a game first, then build your lineup here.</div></div>`;
   }
   const today = isoToday();
-  if (!lineupGameId || !state.games.find(g => g.id === lineupGameId)) {
+  if (!lineupGameId || !findGame(lineupGameId)) {
     const upcoming = games.find(g => g.date >= today);
     lineupGameId = (upcoming || games[games.length - 1]).id;
   }
-  const game = state.games.find(g => g.id === lineupGameId);
+  const game = findGame(lineupGameId);
   if (!game) return '';
   ensureLineup(game.id);
   const lu = state.lineups[game.id];
