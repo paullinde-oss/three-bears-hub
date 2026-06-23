@@ -2617,24 +2617,6 @@ function renderLuGoalieCard(player, gameId, att, viewOnly) {
     <span class="lu-card-tap">${viewOnly ? '' : isAdmin ? 'TAP TO PICK' : '—'}</span>
   </div>`;
 }
-  if (player) {
-    const notIn = !player.spare && (att[player.id] !== 'in');
-    const av = renderAvatar(player, 'lg', false);
-    return `<div class="lu-card filled goalie-card${notIn?' not-in':''}${isSwapSelG?' swap-selected':''}" ${opener}>
-      <span class="lu-card-pos">G</span>
-      <div class="lu-card-av">${av}</div>
-      ${player.spare ? `<span class="lu-spare-lbl">spare</span>` : ''}
-      ${notIn ? `<span class="lu-notin-badge">NOT IN</span>` : ''}
-      <span class="lu-card-name">${esc(player.name)}</span>
-      ${isAdmin ? `<button class="lu-card-x" onclick="event.stopPropagation();clearLineupG(document.getElementById('lineupGameSelect')?.value||'${gameId}')">×</button>` : ''}
-    </div>`;
-  }
-  return `<div class="lu-card empty goalie-card" ${opener}>
-    <span class="lu-card-pos">G</span>
-    <div class="lu-card-empty-icon">+</div>
-    <span class="lu-card-tap">${isAdmin ? 'TAP TO PICK' : '—'}</span>
-  </div>`;
-}
 
 // ═══════════════════════════════════════════════════════
 // AUTO BUILD + SWAP
