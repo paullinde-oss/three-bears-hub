@@ -117,17 +117,22 @@ label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.1em
 .matrix tbody .stk-4{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--rust)}
 .matrix tbody .stk-2{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase}
 .matrix tbody .stk-1{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)}
-.matrix tr.t-full td.stk{background:#FFFAE8}
-.matrix tr.t-part td.stk,.matrix tr.t-part td:not(.stk){background:#EAF4FB}
-.matrix tr.t-goalie td.stk,.matrix tr.t-goalie td:not(.stk){background:#FFFAE8}
-.matrix tr.t-spare td.stk,.matrix tr.t-spare td:not(.stk){background:#FFFAE8}
-.matrix tr.t-sub td.stk,.matrix tr.t-sub td:not(.stk){background:#EAF4FB}
-.matrix tr.t-ir td.stk,.matrix tr.t-ir td:not(.stk){background:#FFCDD2}
+.matrix tr.t-full td.stk{background:#FFFAE8 !important}
+.matrix tr.t-part td.stk{background:#EAF4FB !important}
+.matrix tr.t-part td:not(.stk){background:#EAF4FB}
+.matrix tr.t-goalie td.stk{background:#FFFAE8 !important}
+.matrix tr.t-goalie td:not(.stk){background:#FFFAE8}
+.matrix tr.t-spare td.stk{background:#FFFAE8 !important}
+.matrix tr.t-spare td:not(.stk){background:#FFFAE8}
+.matrix tr.t-sub td.stk{background:#EAF4FB !important}
+.matrix tr.t-sub td:not(.stk){background:#EAF4FB}
+.matrix tr.t-ir td.stk{background:#FFCDD2 !important}
+.matrix tr.t-ir td:not(.stk){background:#FFCDD2}
 .matrix tr.t-ir td:not(.stk){opacity:0.75}
 .matrix tr:hover td:not(.stk){filter:brightness(0.97)}
 .matrix tr.section-divider td{background:var(--ink)!important;color:var(--paper);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;text-align:left;padding:6px 12px;height:28px;}
 .matrix tr.section-divider td:first-child{position:sticky;left:0;z-index:3;min-width:200px;}
-.matrix .att{width:60px;min-width:60px;user-select:none;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px}
+.matrix .att{width:60px;min-width:60px;user-select:none;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;background:inherit;}
 body.is-admin .matrix .att{cursor:pointer}
 body.is-admin .matrix .att:hover{filter:brightness(0.95)}
 .matrix .att.in{background:var(--in-bg);color:var(--in-text)}
@@ -516,12 +521,12 @@ body.is-admin .matrix .carry-cell input:focus{border-color:var(--rust);backgroun
 .stk-7 { left:400px !important; }
 
 /* ── row tint backgrounds must also apply to sticky cells ── */
-tr.t-full .stk { background:#FFFAE8 !important; }
-tr.t-part .stk { background:#F3FAF3 !important; }
-tr.t-sub  .stk { background:#F0F0FB !important; }
-tr.t-spare .stk { background:#F7F7F7 !important; }
-tr.t-goalie .stk { background:#FFF4E0 !important; }
-tr.t-ir .stk { background:#FFF0F0 !important; }
+tr.t-full .stk   { background:#FFFAE8 !important; }
+tr.t-part .stk   { background:#EAF4FB !important; }
+tr.t-sub  .stk   { background:#EAF4FB !important; }
+tr.t-spare .stk  { background:#FFFAE8 !important; }
+tr.t-goalie .stk { background:#FFFAE8 !important; }
+tr.t-ir .stk     { background:#FFCDD2 !important; }
 
 /* ── attendance cells: bigger, bolder icons ── */
 .att { font-size:16px !important;font-weight:700 !important; }
@@ -1783,7 +1788,8 @@ function renderMatrix(s, players, games) {
       const status = (state.attendance[g.id] && state.attendance[g.id][p.id]) || '';
       const attIcon = status==='in' ? '✓' : status==='out' ? '✗' : status==='cut' ? '✓' : '';
       const cellCls = (status ? 'att ' + status : 'att') + (isPast && !isUnlocked ? ' att-locked' : '');
-      body += `<td class="${cellCls}" ${editable ? `onclick="cycleAttend('${g.id}','${p.id}',this)"` : ''} title="${esc(p.name)} — Game ${g.number || ''}${isPast && !isUnlocked ? ' (locked — click 🔓 to edit)' : ''}">${attIcon}</td>`;
+      const emptyCellBg = !status ? `style="background:${rowTint}"` : '';
+      body += `<td class="${cellCls}" ${emptyCellBg} ${editable ? `onclick="cycleAttend('${g.id}','${p.id}',this,'${rowTint}')"` : ''} title="${esc(p.name)} — Game ${g.number || ''}${isPast && !isUnlocked ? ' (locked — click 🔓 to edit)' : ''}">${attIcon}</td>`;
     });
     body += `<td class="games-played ${gp === 0 ? 'zero' : ''}">${gp}</td>
       <td class="eligible ${eligible ? 'yes' : 'no'}">${eligible ? '✓' : ''}</td></tr>`;
@@ -1800,24 +1806,25 @@ function renderMatrix(s, players, games) {
   return `<div class="matrix-scroll-outer"><button class="matrix-arrow matrix-arrow-left" onclick="scrollMatrix(this,-1)">‹</button><div class="matrix-wrap"><table class="matrix"><thead>${head}</thead><tbody>${body}${bodiesRow}</tbody></table></div><button class="matrix-arrow matrix-arrow-right" onclick="scrollMatrix(this,1)">›</button></div>`;
 }
 
-async function cycleAttend(gameId, playerId, el) {
+async function cycleAttend(gameId, playerId, el, rowTint) {
   if (!requireAdmin()) return;
   if (!state.attendance[gameId]) state.attendance[gameId] = {};
   const cur = state.attendance[gameId][playerId] || '';
   const next = cur === '' ? 'in' : cur === 'in' ? 'out' : cur === 'out' ? 'cut' : '';
   if (next === '') delete state.attendance[gameId][playerId];
   else state.attendance[gameId][playerId] = next;
-  // Auto-remove from lineup if player is no longer IN
   if (next !== 'in' && state.lineups[gameId]) {
     const lu = state.lineups[gameId];
     ['f1','f2','f3'].forEach(k => { if(lu[k]) ['L','C','R'].forEach(p => { if(lu[k][p]===playerId) lu[k][p]=''; }); });
     ['d1','d2'].forEach(k => { if(lu[k]) ['L','R'].forEach(p => { if(lu[k][p]===playerId) lu[k][p]=''; }); });
     if(lu.g===playerId) lu.g='';
   }
-  // Update the cell in-place — no full re-render, no scroll jump
   if (el) {
     el.className = (next ? 'att ' + next : 'att') + (el.className.includes('att-locked') ? ' att-locked' : '');
     el.textContent = next === 'in' ? '✓' : next === 'out' ? '✗' : next === 'cut' ? '✓' : '';
+    // Restore row tint on empty, clear inline style when status is set (CSS takes over)
+    if (!next && rowTint) el.style.background = rowTint;
+    else el.style.background = '';
   }
   await saveState();
 }
