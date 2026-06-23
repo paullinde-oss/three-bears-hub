@@ -1377,7 +1377,7 @@ function gamesPlayedFor(pId, sId) {
 }
 function bodiesForGame(gId, sId) {
   const att = state.attendance[gId] || {};
-  return seasonPlayers(sId).filter(p => att[p.id] === 'in' && p.type !== 'ir' && p.type !== 'goalie').length;
+  return seasonPlayers(sId).filter(p => att[p.id] === 'in' && p.type !== 'ir' && p.type !== 'goalie' && p.position?.toLowerCase() !== 'g').length;
 }
 function beersForGame(gId) {
   const b = state.beers[gId] || {};
@@ -1796,7 +1796,9 @@ function renderMatrix(s, players, games) {
       <td class="eligible ${eligible ? 'yes' : 'no'}">${eligible ? '✓' : ''}</td></tr>`;
   });
 
-  const avgBodies = games.length === 0 ? 0 : (games.reduce((sum, g) => sum + bodiesForGame(g.id, s.id), 0) / games.length).toFixed(1);
+  const today = isoToday();
+  const pastGames = games.filter(g => g.date && g.date < today);
+  const avgBodies = pastGames.length === 0 ? '—' : (pastGames.reduce((sum, g) => sum + bodiesForGame(g.id, s.id), 0) / pastGames.length).toFixed(1);
   const bodiesRow = `<tr class="bodies-row">
     <td class="stk stk-2" colspan="2" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:6px 12px;">Bodies</td>
     <td class="stk stk-4"></td><td class="stk stk-5 mob-hide"></td><td class="stk stk-6 mob-hide"></td><td class="stk stk-7"></td>
