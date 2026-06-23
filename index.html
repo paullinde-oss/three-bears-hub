@@ -3254,7 +3254,9 @@ async function renderSchedule() {
 // =============== IN/OUT WHATSAPP ===============
 function sendInOutWhatsApp(gameId) {
   if (!requireAdmin()) return;
-  const g = state.games.find(x => x.id === gameId);
+  // Look in SportNinja cache first, then Firebase
+  const allGames = [...(snGamesCache || []), ...(state.games || [])];
+  const g = allGames.find(x => x.id === gameId);
   if (!g) return;
   const teamName = (state.team?.name || 'Three Bears').toUpperCase();
   const opp = (g.isHome ? 'vs' : '@') + ' ' + (g.opponent || 'TBD');
