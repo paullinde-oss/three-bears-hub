@@ -3152,9 +3152,10 @@ function openAddToCalendar() {
   const existing = document.getElementById('calOverlay');
   if (existing) existing.remove();
   const ical = encodeURIComponent(SN_CALENDAR_URL);
-  const googleUrl = `https://calendar.google.com/calendar/r?cid=${ical}`;
-  const appleUrl = SN_CALENDAR_URL;
-  const outlookUrl = `https://outlook.live.com/calendar/0/addcalendar?url=${ical}`;
+  const webcalUrl = SN_CALENDAR_URL.replace('https://', 'webcal://');
+  const googleUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`;
+  const appleUrl = webcalUrl;
+  const outlookUrl = `https://outlook.live.com/calendar/0/addcalendar?url=${encodeURIComponent(webcalUrl)}`;
 
   const overlay = document.createElement('div');
   overlay.id = 'calOverlay';
