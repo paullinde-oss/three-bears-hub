@@ -1432,201 +1432,7 @@ function openModal(html, onMount) {
 function closeModal() { document.getElementById('modalBg').classList.remove('open'); }
 document.getElementById('modalBg').addEventListener('click', e => { if (e.target.id === 'modalBg') closeModal(); });
 
-// =================== CALENDAR EXPORT ===================
-
-function openCalendarExport() {
-  const existing = document.getElementById('calendarOverlay');
-  if (existing) existing.remove();
-
-  const s = activeSeason();
-  if (!s) return;
-  const today = isoToday();
-  const allGames = seasonGames(s.id);
-  // Only show upcoming games (today or future)
-  const upcomingGames = allGames.filter(g => !g.date || g.date >= today);
-
-  const overlay = document.createElement('div');
-  overlay.id = 'calendarOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
-
-  const gameRows = upcomingGames.length === 0
-    ? '<p style="color:var(--muted);font-size:14px;padding:8px 0;">No upcoming games scheduled.</p>'
-    : upcomingGames.map(g => {
-        const label = `Game ${g.number || '?'} — ${fmtDateShort(g.date)}${g.time ? ' ' + fmtAmPm(g.time) : ''} vs ${esc(g.opponent || 'TBD')}`;
-        return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer;user-select:none;transition:background 0.1s;" onmouseover="this.style.background='var(--paper-3)'" onmouseout="this.style.background='transparent'">
-          <input type="checkbox" class="cal-check" data-gid="${g.id}" checked style="width:16px;height:16px;accent-color:var(--rust);flex-shrink:0;cursor:pointer;">
-          <span style="font-size:13px;line-height:1.4;">${label}</span>
-        </label>`;
-      }).join('');
-
-  overlay.innerHTML = `
-    <div style="background:var(--paper);border-radius:14px;width:100%;max-width:480px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
-      <div style="padding:20px 20px 0 20px;flex-shrink:0;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-          <h2 style="margin:0;font-size:18px;font-family:'DM Sans',sans-serif;">📅 Add Games to Calendar</h2>
-          <button onclick="document.getElementById('calendarOverlay').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1;padding:0 4px;">×</button>
-        </div>
-        <p style="margin:0 0 12px;font-size:13px;color:var(--muted);">Choose which upcoming games to add. Works with Apple Calendar, Google Calendar, Outlook and more.</p>
-        <div style="display:flex;gap:8px;margin-bottom:12px;">
-          <button onclick="calSelectAll(true)" class="btn btn-ghost btn-sm" style="font-size:12px;">Select All</button>
-          <button onclick="calSelectAll(false)" class="btn btn-ghost btn-sm" style="font-size:12px;">Deselect All</button>
-        </div>
-        <div style="height:1px;background:var(--line);margin:0 -20px;"></div>
-      </div>
-      <div style="overflow-y:auto;padding:10px 20px;flex:1;">
-        ${gameRows}
-      </div>
-      <div style="padding:16px 20px;border-top:1px solid var(--line);flex-shrink:0;display:flex;flex-direction:column;gap:10px;">
-        <div style="display:flex;gap:10px;">
-          <button onclick="downloadICS()" class="btn btn-rust" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Apple / .ics
-          </button>
-          <button onclick="openGoogleCalendar()" class="btn" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#4285F4;color:white;border-color:#4285F4;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
-            Google Calendar
-          </button>
-        </div>
-        <p id="calTip" style="margin:0;font-size:11px;color:var(--muted);text-align:center;">💡 <strong>Apple / .ics</strong> — imports all selected games at once &nbsp;·&nbsp; <strong>Google Calendar</strong> — adds one game per tab</p>
-      </div>
-    </div>`;
-
-  document.body.appendChild(overlay);
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-}
-
-function calSelectAll(checked) {
-  document.querySelectorAll('.cal-check').forEach(cb => cb.checked = checked);
-}
-
-function getSelectedGames() {
-  const s = activeSeason();
-  if (!s) return [];
-  const games = seasonGames(s.id);
-  const selected = new Set([...document.querySelectorAll('.cal-check:checked')].map(cb => cb.dataset.gid));
-  return games.filter(g => selected.has(g.id));
-}
-
-function gameToICSDate(dateStr, timeStr) {
-  if (!dateStr) return null;
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const pad = n => String(n).padStart(2, '0');
-  if (timeStr) {
-    const parts = timeStr.split(':');
-    const startH = parseInt(parts[0]);
-    const startM = parseInt(parts[1]) || 0;
-    let endH = startH + 1;
-    let endM = startM;
-    if (endH >= 24) endH = 23;
-    const dtStart = `${y}${pad(m)}${pad(d)}T${pad(startH)}${pad(startM)}00`;
-    const dtEnd   = `${y}${pad(m)}${pad(d)}T${pad(endH)}${pad(endM)}00`;
-    return { dtStart, dtEnd, allDay: false };
-  } else {
-    const dtStart = `${y}${pad(m)}${pad(d)}`;
-    const dtEnd = incrementDate(dateStr).replace(/-/g, '');
-    return { dtStart, dtEnd, allDay: true };
-  }
-}
-
-function buildICS(games) {
-  const team = state.team?.name || 'Three Bears';
-  const s = activeSeason();
-  const seasonName = s?.name || '';
-  const now = new Date();
-  const stamp = now.toISOString().replace(/[-:.]/g,'').slice(0,15) + 'Z';
-
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Three Bears Hockey Hub//EN',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    `X-WR-CALNAME:${team} Schedule`,
-    'X-WR-TIMEZONE:America/Vancouver',
-  ];
-
-  games.forEach(g => {
-    const dates = gameToICSDate(g.date, g.time);
-    if (!dates) return;
-    const title = `${team} vs ${g.opponent || 'TBD'}`;
-    const desc = `Game ${g.number || '?'} · ${seasonName}`;
-    const loc = g.rinkName || '';
-    const uid = `${g.id}-${Date.now()}@threebearshockey`;
-
-    lines.push('BEGIN:VEVENT');
-    lines.push(`UID:${uid}`);
-    lines.push(`DTSTAMP:${stamp}`);
-    if (dates.allDay) {
-      lines.push(`DTSTART;VALUE=DATE:${dates.dtStart}`);
-      lines.push(`DTEND;VALUE=DATE:${dates.dtEnd}`);
-    } else {
-      lines.push(`DTSTART:${dates.dtStart}`);
-      lines.push(`DTEND:${dates.dtEnd}`);
-    }
-    lines.push(`SUMMARY:${title}`);
-    lines.push(`DESCRIPTION:${desc}`);
-    if (loc) lines.push(`LOCATION:${loc}`);
-    lines.push('END:VEVENT');
-  });
-
-  lines.push('END:VCALENDAR');
-  return lines.join('\r\n');
-}
-
-function downloadICS() {
-  const games = getSelectedGames();
-  if (!games.length) { alert('Please select at least one game.'); return; }
-  const ics = buildICS(games);
-  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const teamSlug = (state.team?.name || 'three-bears').replace(/\s+/g, '-').toLowerCase();
-  a.href = url;
-  a.download = `${teamSlug}-schedule.ics`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  const tip = document.getElementById('calTip');
-  if (tip) {
-    tip.innerHTML = '✅ Downloaded! Open the file — Apple Calendar imports all games at once. On Android, open with Google Calendar.';
-    tip.style.color = 'var(--rust)';
-    tip.style.fontWeight = '600';
-  }
-}
-
-function openGoogleCalendar() {
-  const games = getSelectedGames();
-  if (!games.length) { alert('Please select at least one game.'); return; }
-  const team = state.team?.name || 'Three Bears';
-  const s = activeSeason();
-
-  if (games.length > 3) {
-    const proceed = confirm(`Google Calendar adds one game per browser tab.\n\nYou've selected ${games.length} games — this will open ${games.length} tabs.\n\nTip: "Apple / .ics" adds all games at once and also works on Android.\n\nOpen ${games.length} tabs anyway?`);
-    if (!proceed) return;
-  }
-
-  games.forEach((g, i) => {
-    const dates = gameToICSDate(g.date, g.time);
-    if (!dates) return;
-    const title = encodeURIComponent(`${team} vs ${g.opponent || 'TBD'}`);
-    const details = encodeURIComponent(`Game ${g.number || '?'} · ${s?.name || ''}${g.rinkName ? '\nRink: ' + g.rinkName : ''}`);
-    const loc = encodeURIComponent(g.rinkName || '');
-    const datesParam = dates.allDay
-      ? `${dates.dtStart}/${dates.dtEnd}`
-      : `${dates.dtStart}/${dates.dtEnd}`;
-    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${datesParam}&details=${details}&location=${loc}`;
-    setTimeout(() => window.open(url, '_blank'), i * 400);
-  });
-}
-
-function incrementDate(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const dt = new Date(y, m - 1, d + 1);
-  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-}
-
-// =================== END CALENDAR EXPORT ===================
+// Calendar handled by openAddToCalendar() using SportNinja live feed
 
 function toggleGameLock(gameId) {
   if (unlockedPastGames.has(gameId)) {
@@ -1691,7 +1497,7 @@ function render() {
   const c = document.getElementById('content');
   if (activeTab === 'dashboard') { c.innerHTML = renderDashboard(); setTimeout(scrollToRecentGame, 50); }
   else if (activeTab === 'beer') { c.innerHTML = renderBeerBank(); setTimeout(scrollToRecentGame, 50); }
-  else if (activeTab === 'schedule') c.innerHTML = renderSchedule();
+  else if (activeTab === 'schedule') { renderSchedule().then(html => { if (activeTab === 'schedule') c.innerHTML = html; }); c.innerHTML = '<div class="matrix-empty" style="padding:32px;text-align:center;"><span style="opacity:0.5;font-size:13px;">Loading schedule from SportNinja…</span></div>'; }
   else if (activeTab === 'settings') c.innerHTML = renderSettings();
 }
 
@@ -1860,7 +1666,7 @@ function renderDashboard() {
       <button class="btn" onclick="openAddGame()">+ Add Game</button>` : ''}
       <div class="spacer"></div>
       ${isAdmin && games.length > 0 && players.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="cycleAllAttend()">Mark all blank → IN</button>` : ''}
-      ${games.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="openCalendarExport()" title="Export games to Google / Apple Calendar" style="display:inline-flex;align-items:center;gap:5px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Add to Calendar</button>` : ''}
+      ${games.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="openAddToCalendar()" style="display:inline-flex;align-items:center;gap:5px;">📅 Add to Calendar</button>` : ''}
     </div>
 
     ${players.length === 0
@@ -3278,36 +3084,132 @@ async function clearLineup(gameId) {
 }
 
 // =============== SCHEDULE ===============
-function renderSchedule() {
+// =============== SPORTNINJA CONSTANTS ===============
+const SN_TEAM_ID = '7k4lXyCnOQqD2h47';
+const SN_SCHEDULE_ID = 'RKUIllHs4Gcvvf5v';
+const SN_CALENDAR_URL = 'https://canlan2-api.sportninja.net/v1/calendar/7k4lXyCnOQqD2h47/games';
+const SN_GAMES_URL = `https://canlan2-api.sportninja.net/v1/schedules/${SN_SCHEDULE_ID}/games?page=1&order=asc&exclude_cancelled_games=1&team_id=${SN_TEAM_ID}&starts_after=${new Date().getFullYear()-1}-01-01T00:00:00-07:00&starts_before=${new Date().getFullYear()+1}-12-31T00:00:00-07:00`;
+
+let snGamesCache = null;
+let snGamesLastFetch = 0;
+
+async function fetchSNGames() {
+  const now = Date.now();
+  if (snGamesCache && now - snGamesLastFetch < 5 * 60 * 1000) return snGamesCache;
+  try {
+    const res = await fetch(SN_GAMES_URL);
+    if (!res.ok) throw new Error('API error');
+    const json = await res.json();
+    snGamesCache = (json.data || []).map(g => {
+      const isHome = g.homeTeam?.id === SN_TEAM_ID;
+      const opp = isHome ? g.visitingTeam?.name : g.homeTeam?.name;
+      const dt = new Date(g.starts_at);
+      const date = dt.toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' }); // YYYY-MM-DD
+      const time = dt.toLocaleTimeString('en-CA', { timeZone: 'America/Vancouver', hour: '2-digit', minute: '2-digit', hour12: false });
+      const rink = g.facility?.name || '';
+      const division = g.schedule?.name || '';
+      return { id: g.id, snId: g.id, number: g.league_game_number, date, time, opponent: opp || 'TBD', isHome, location: rink ? `${rink} — Canlan Langley` : 'Canlan Langley', division, ourScore: g.homeScore ?? (isHome ? g.stats?.home_score : g.stats?.visiting_score), theirScore: isHome ? g.stats?.visiting_score : g.stats?.home_score };
+    });
+    snGamesLastFetch = now;
+    return snGamesCache;
+  } catch (e) { return null; }
+}
+
+function openAddToCalendar() {
+  const existing = document.getElementById('calOverlay');
+  if (existing) existing.remove();
+  const ical = encodeURIComponent(SN_CALENDAR_URL);
+  const googleUrl = `https://calendar.google.com/calendar/r?cid=${ical}`;
+  const appleUrl = SN_CALENDAR_URL;
+  const outlookUrl = `https://outlook.live.com/calendar/0/addcalendar?url=${ical}`;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'calOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `
+    <div style="background:var(--paper);border-radius:16px;width:100%;max-width:420px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+      <div style="padding:24px 24px 20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <h2 style="margin:0;font-size:20px;font-family:'Fraunces',serif;">📅 Subscribe to Schedule</h2>
+          <button onclick="document.getElementById('calOverlay').remove()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--muted);line-height:1;">×</button>
+        </div>
+        <p style="margin:0 0 20px;font-size:13px;color:var(--muted);line-height:1.5;">Add all Three Bears games to your personal calendar. Updates automatically when the schedule changes — no need to re-add.</p>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <button onclick="window.open('${googleUrl}','_blank')" style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:10px;border:none;background:#4285F4;color:white;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Google Calendar
+          </button>
+          <button onclick="window.location.href='${appleUrl}'" style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:10px;border:none;background:#000;color:white;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            Apple Calendar
+          </button>
+          <button onclick="window.open('${outlookUrl}','_blank')" style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:10px;border:1px solid var(--line);background:var(--paper-3);color:var(--ink);font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#0078D4"><path d="M7 12a5 5 0 1 0 10 0A5 5 0 0 0 7 12zm2 0a3 3 0 1 1 6 0 3 3 0 0 1-6 0z"/><path d="M1 4h22v16H1z" fill="none" stroke="#0078D4" stroke-width="2"/><path d="M8 4v16M16 4v16M1 12h22" stroke="#0078D4" stroke-width="1.5" fill="none"/></svg>
+            Outlook
+          </button>
+        </div>
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line);">
+          <p style="margin:0 0 8px;font-size:12px;color:var(--muted);">Or copy the calendar link to subscribe manually:</p>
+          <div style="display:flex;gap:8px;">
+            <input readonly value="${SN_CALENDAR_URL}" style="flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:11px;background:var(--paper-2);color:var(--muted);">
+            <button onclick="navigator.clipboard.writeText('${SN_CALENDAR_URL}').then(()=>{this.textContent='✓';setTimeout(()=>this.textContent='Copy',1500)})" style="padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--paper-3);cursor:pointer;font-size:13px;font-family:'DM Sans',sans-serif;">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+async function renderSchedule() {
   const s = activeSeason();
   if (!s) return `<div class="matrix-empty">No active season.</div>`;
-  const games = seasonGames(s.id);
   const today = isoToday();
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + 10);
   const cutoffStr = cutoff.toISOString().slice(0,10);
-  const rows = games.length === 0 ? `<div class="matrix-empty">No games yet${isAdmin ? '. Click "+ Add Game" to start.' : '.'}</div>` :
-    games.map(g => {
-      const us = parseInt(g.ourScore), them = parseInt(g.theirScore);
-      const hasScore = !isNaN(us) && !isNaN(them);
-      let resTxt = '—', resCls = '';
-      if (hasScore) { resTxt = us + '-' + them; resCls = us > them ? 'good' : us < them ? 'bad' : 'warn'; }
-      else if (g.date < today) resTxt = 'no score';
-      const bodies = bodiesForGame(g.id, s.id);
-      const isUpcoming = g.date && g.date >= today && g.date <= cutoffStr;
-      const inOutBtn = isAdmin && isUpcoming ? `<button class="btn btn-ghost btn-sm" onclick="sendInOutWhatsApp('${g.id}')" title="Send IN/OUT request to group chat">📤 IN/OUT?</button>` : '';
-      return `<div class="game-card">
-        <div class="gnum">G${g.number || '?'}</div>
-        <div class="info">
-          <div class="opp">${g.isHome ? 'vs' : '@'} ${esc(g.opponent || 'TBD')}${hasScore ? ` <span class="pill ${resCls}">${us > them ? 'W' : us < them ? 'L' : 'T'}</span>` : ''}</div>
-          <div class="det">${fmtDateShort(g.date)}${g.time ? ' · ' + fmtAmPm(g.time) : ''}${g.location ? ' · ' + esc(g.location) : ''} · ${bodies} bodies in</div>
-        </div>
-        <div class="score">${resTxt}</div>
-        <div style="display:flex;gap:6px;">${inOutBtn}${isAdmin ? `<button class="btn btn-ghost btn-sm" onclick="openGameForm('${g.id}')">Edit</button>` : ''}</div>
-      </div>`;
-    }).join('');
+
+  // Try SportNinja first
+  const snGames = await fetchSNGames();
+  const games = snGames || seasonGames(s.id);
+  const isLive = !!snGames;
+
+  const rows = games.length === 0
+    ? `<div class="matrix-empty">No games scheduled.</div>`
+    : games.map(g => {
+        const us = parseInt(g.ourScore), them = parseInt(g.theirScore);
+        const hasScore = !isNaN(us) && !isNaN(them);
+        let resTxt = '—', resCls = '';
+        if (hasScore) { resTxt = us + '-' + them; resCls = us > them ? 'good' : us < them ? 'bad' : 'warn'; }
+        else if (g.date < today) resTxt = 'pending';
+        const bodies = bodiesForGame(g.id, s.id);
+        const isUpcoming = g.date && g.date >= today && g.date <= cutoffStr;
+        const inOutBtn = isAdmin && isUpcoming ? `<button class="btn btn-ghost btn-sm" onclick="sendInOutWhatsApp('${g.id}')" title="Send IN/OUT request">📤 IN/OUT?</button>` : '';
+        const editBtn = isAdmin && !isLive ? `<button class="btn btn-ghost btn-sm" onclick="openGameForm('${g.id}')">Edit</button>` : '';
+        const divBadge = g.division ? `<span style="font-size:10px;opacity:0.6;margin-left:4px;">${esc(g.division)}</span>` : '';
+        return `<div class="game-card">
+          <div class="gnum">G${g.number || '?'}</div>
+          <div class="info">
+            <div class="opp">${g.isHome ? 'vs' : '@'} ${esc(g.opponent || 'TBD')}${divBadge}${hasScore ? ` <span class="pill ${resCls}">${us > them ? 'W' : us < them ? 'L' : 'T'}</span>` : ''}</div>
+            <div class="det">${fmtDateShort(g.date)}${g.time ? ' · ' + fmtAmPm(g.time) : ''}${g.location ? ' · ' + esc(g.location) : ''} · ${bodies} bodies in</div>
+          </div>
+          <div class="score">${resTxt}</div>
+          <div style="display:flex;gap:6px;">${inOutBtn}${editBtn}</div>
+        </div>`;
+      }).join('');
+
+  const syncBadge = isLive
+    ? `<span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted);letter-spacing:0.05em;display:inline-flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:#4CAF50;display:inline-block;"></span> LIVE from SportNinja</span>`
+    : '';
+
   return `<div class="row-spread" style="margin-bottom:14px;">
-    <h3 style="font-family:'Fraunces',serif;font-weight:700;font-size:22px;">Schedule · ${esc(s.name)} <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);font-weight:normal;letter-spacing:0.05em;">${games.length} game${games.length === 1 ? '' : 's'}</span></h3>
-    ${isAdmin ? `<button class="btn btn-rust" onclick="openAddGame()">+ Add Game</button>` : ''}
+    <div>
+      <h3 style="font-family:'Fraunces',serif;font-weight:700;font-size:22px;margin:0 0 4px;">Schedule · ${esc(s.name)} <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);font-weight:normal;letter-spacing:0.05em;">${games.length} game${games.length === 1 ? '' : 's'}</span></h3>
+      ${syncBadge}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn btn-ghost btn-sm" onclick="openAddToCalendar()" style="display:inline-flex;align-items:center;gap:5px;">📅 Add to Calendar</button>
+      ${isAdmin && !isLive ? `<button class="btn btn-rust" onclick="openAddGame()">+ Add Game</button>` : ''}
+    </div>
   </div>${rows}`;
 }
 
