@@ -1454,7 +1454,10 @@ function scrollToRecentGame() {
   const today = isoToday();
   const s = activeSeason();
   if (!s) return;
-  const games = seasonGames(s.id);
+  const fbG = seasonGames(s.id);
+  const snL = snGamesCache || [];
+  const snI = new Set(snL.map(g => g.id));
+  const games = [...fbG.filter(g => !snI.has(g.id)), ...snL].sort((a,b) => (a.date||'').localeCompare(b.date||''));
   let recentIdx = -1;
   games.forEach((g, i) => { if (g.date && g.date <= today) recentIdx = i; });
   if (recentIdx < 0) return;
@@ -1921,7 +1924,12 @@ function renderBeerBank() {
   const s = activeSeason();
   if (!s) return `<div class="matrix-empty">No active season.</div>`;
   const players = seasonPlayers(s.id);
-  const games = seasonGames(s.id);
+  // Merge Firebase past games + SportNinja upcoming games
+  const fbGames = seasonGames(s.id);
+  const snList = snGamesCache || [];
+  const snIds = new Set(snList.map(g => g.id));
+  const pastFbGames = fbGames.filter(g => !snIds.has(g.id));
+  const games = [...pastFbGames, ...snList].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
   const totalBeersConsumed = players.reduce((sum,p) => sum + seasonBeersForPlayer(p.id, s.id), 0);
   const beerValue = totalBeersConsumed * (state.pricePerBeer || 0);
@@ -3133,7 +3141,7 @@ async function fetchSNGames() {
       return {
         id: g.id,           // use SportNinja ID — attendance/beers in Firebase keyed to this
         snId: g.id,
-        number: idx + 1,    // renumber G1, G2, G3...
+        number: (seasonGames(activeSeason()?.id || '').length) + idx + 1,  // continue from last Firebase game number
         date, time,
         opponent: opp || 'TBD',
         isHome,
