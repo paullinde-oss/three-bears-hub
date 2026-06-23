@@ -125,8 +125,8 @@ label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.1em
 .matrix tr.t-ir td.stk,.matrix tr.t-ir td:not(.stk){background:#FFCDD2}
 .matrix tr.t-ir td:not(.stk){opacity:0.75}
 .matrix tr:hover td:not(.stk){filter:brightness(0.97)}
-.matrix tr.section-divider td{background:var(--ink)!important;color:var(--paper);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;text-align:left;padding:6px 12px;height:28px;position:sticky;left:0;z-index:2;}
-.section-group-label{background:var(--ink);color:var(--paper);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;padding:6px 14px;height:28px;display:flex;align-items:center;margin-top:2px;border-radius:4px 4px 0 0;}
+.matrix tr.section-divider td{background:var(--ink)!important;color:var(--paper);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;text-align:left;padding:6px 12px;height:28px;}
+.matrix tr.section-divider td:first-child{position:sticky;left:0;z-index:3;min-width:200px;}
 .matrix .att{width:60px;min-width:60px;user-select:none;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px}
 body.is-admin .matrix .att{cursor:pointer}
 body.is-admin .matrix .att:hover{filter:brightness(0.95)}
@@ -1757,13 +1757,11 @@ function renderMatrix(s, players, games) {
 
   let body = '';
   let lastType = null;
-  let currentGroup = '';
-  let groups = []; // [{label, rows}]
 
   players.forEach((p, idx) => {
     if (p.type !== lastType) {
       const info = TYPE_INFO[p.type] || TYPE_INFO.full;
-      groups.push({ label: info.label, rows: [] });
+      body += `<tr class="section-divider"><td class="stk stk-2" colspan="6">${info.label}</td>${games.map(() => '<td></td>').join('')}<td></td><td></td></tr>`;
       lastType = p.type;
     }
     const allocated = parseFloat(p.allocated) || 0;
@@ -1778,7 +1776,7 @@ function renderMatrix(s, players, games) {
     const eligible = gp >= playoffMin;
     const tintMap = { full:'#FFFAE8',part:'#F3FAF3',sub:'#F0F0FB',spare:'#F7F7F7',goalie:'#FFF4E0',ir:'#FFF0F0' };
     const rowTint = tintMap[p.type]||'transparent';
-    let row = `<tr class="t-${p.type}" data-pid="${p.id}" style="background:${rowTint}">
+    body += `<tr class="t-${p.type}" data-pid="${p.id}" style="background:${rowTint}">
       <td class="stk stk-2">${esc(p.position || '')}</td>
       <td class="stk stk-3" onclick="openProfile('${p.id}')" style="cursor:pointer"><span class="matrix-name-cell" style="display:inline-flex;align-items:center;gap:5px">${renderAvatar(p, 'sm')}<span>${esc(p.name)}</span></span></td>
       <td class="stk stk-4">${esc(p.jerseyNumber || '')}</td>
@@ -1792,30 +1790,20 @@ function renderMatrix(s, players, games) {
       const status = (state.attendance[g.id] && state.attendance[g.id][p.id]) || '';
       const attIcon = status==='in' ? '✓' : status==='out' ? '✗' : status==='cut' ? '✓' : '';
       const cellCls = (status ? 'att ' + status : 'att') + (isPast && !isUnlocked ? ' att-locked' : '');
-      row += `<td class="${cellCls}" ${editable ? `onclick="cycleAttend('${g.id}','${p.id}',this)"` : ''} title="${esc(p.name)} — Game ${g.number || ''}${isPast && !isUnlocked ? ' (locked — click 🔓 to edit)' : ''}">${attIcon}</td>`;
+      body += `<td class="${cellCls}" ${editable ? `onclick="cycleAttend('${g.id}','${p.id}',this)"` : ''} title="${esc(p.name)} — Game ${g.number || ''}${isPast && !isUnlocked ? ' (locked — click 🔓 to edit)' : ''}">${attIcon}</td>`;
     });
-    row += `<td class="games-played ${gp === 0 ? 'zero' : ''}">${gp}</td>
+    body += `<td class="games-played ${gp === 0 ? 'zero' : ''}">${gp}</td>
       <td class="eligible ${eligible ? 'yes' : 'no'}">${eligible ? '✓' : ''}</td></tr>`;
-    groups[groups.length - 1].rows.push(row);
   });
 
-  // Render bodies row (totals)
-  let bodiesRow = '';
-  const bodiesByGame = games.map(g => bodiesForGame(g.id, s.id));
-  bodiesRow = `<tr class="totals-row"><td class="stk stk-2" colspan="2" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:6px 12px;">BODIES</td>
-    <td class="stk stk-4 mob-hide"></td><td class="stk stk-5 mob-hide"></td><td class="stk stk-6 mob-hide"></td><td class="stk stk-7"></td>
-    ${bodiesByGame.map(b => `<td style="text-align:center;font-size:12px;font-weight:600;">${b||''}</td>`).join('')}
-    <td></td><td></td></tr>`;
+  const avgBodies = games.length === 0 ? 0 : (games.reduce((sum, g) => sum + bodiesForGame(g.id, s.id), 0) / games.length).toFixed(1);
+  const bodiesRow = `<tr class="bodies-row">
+    <td class="stk stk-2" colspan="2" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:6px 12px;">Bodies</td>
+    <td class="stk stk-4"></td><td class="stk stk-5 mob-hide"></td><td class="stk stk-6 mob-hide"></td><td class="stk stk-7"></td>
+    ${games.map(g => `<td style="text-align:center;font-size:12px;font-weight:600;">${bodiesForGame(g.id, s.id)||''}</td>`).join('')}
+    <td colspan="2" style="text-align:center;font-size:11px;opacity:0.6;">avg ${avgBodies}</td></tr>`;
 
-  // Build grouped tables
-  const groupedTables = groups.map(group => `
-    <div class="section-group-label">${group.label}</div>
-    <div class="matrix-scroll-outer"><button class="matrix-arrow matrix-arrow-left" onclick="scrollMatrix(this,-1)">‹</button><div class="matrix-wrap"><table class="matrix"><thead>${head}</thead><tbody>${group.rows.join('')}</tbody></table></div><button class="matrix-arrow matrix-arrow-right" onclick="scrollMatrix(this,1)">›</button></div>
-  `).join('');
-
-  return `${groupedTables}
-    <div class="matrix-scroll-outer"><button class="matrix-arrow matrix-arrow-left" onclick="scrollMatrix(this,-1)">‹</button><div class="matrix-wrap"><table class="matrix"><thead>${head}</thead><tbody>${bodiesRow}</tbody></table></div><button class="matrix-arrow matrix-arrow-right" onclick="scrollMatrix(this,1)">›</button></div>`;
-
+  return `<div class="matrix-scroll-outer"><button class="matrix-arrow matrix-arrow-left" onclick="scrollMatrix(this,-1)">‹</button><div class="matrix-wrap"><table class="matrix"><thead>${head}</thead><tbody>${body}${bodiesRow}</tbody></table></div><button class="matrix-arrow matrix-arrow-right" onclick="scrollMatrix(this,1)">›</button></div>`;
 }
 
 async function cycleAttend(gameId, playerId, el) {
