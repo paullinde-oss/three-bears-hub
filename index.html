@@ -2565,11 +2565,11 @@ function slotPlayer(slotVal, players) {
 }
 
 // Render a lineup card (pill-shaped slot)
-function renderLuCard(player, posLabel, gameId, slotKey, posKey, att) {
+function renderLuCard(player, posLabel, gameId, slotKey, posKey, att, viewOnly) {
   const flip = posLabel === 'RW' || posLabel === 'RD';
   const liveId = `document.getElementById('lineupGameSelect')?.value||'${gameId}'`;
   const isSwapSel = swapMode && swapSlot1 && swapSlot1.slotKey===slotKey && swapSlot1.posKey===posKey;
-  const opener = isAdmin
+  const opener = (!viewOnly && isAdmin)
     ? (swapMode
         ? `onclick="handleSwapClick(${liveId},'${slotKey}','${posKey}')"`
         : `onclick="openLineupPicker(${liveId},'${slotKey}','${posKey}')"`)
@@ -2577,30 +2577,46 @@ function renderLuCard(player, posLabel, gameId, slotKey, posKey, att) {
   if (player) {
     const notIn = !player.spare && (att[player.id] !== 'in');
     const av = renderAvatar(player, 'lg', flip);
-    return `<div class="lu-card filled${notIn?' not-in':''}${isSwapSel?' swap-selected':''}" ${opener}>
+    return `<div class="lu-card filled${notIn?' not-in':''}${isSwapSel?' swap-selected':''}${viewOnly?' view-only':''}" ${opener} style="${viewOnly?'opacity:0.8;cursor:default;':''}">
       <span class="lu-card-pos">${posLabel}</span>
       <div class="lu-card-av">${av}</div>
       ${player.spare ? `<span class="lu-spare-lbl">spare</span>` : ''}
       ${notIn ? `<span class="lu-notin-badge">NOT IN</span>` : ''}
       <span class="lu-card-name">${esc(player.name)}</span>
-      ${isAdmin ? `<button class="lu-card-x" onclick="event.stopPropagation();clearLineupSlot(document.getElementById('lineupGameSelect')?.value||'${gameId}','${slotKey}','${posKey}')">×</button>` : ''}
     </div>`;
   }
-  return `<div class="lu-card empty" ${opener}>
+  return `<div class="lu-card empty${viewOnly?' view-only':''}" style="${viewOnly?'opacity:0.5;cursor:default;':''}">
     <span class="lu-card-pos">${posLabel}</span>
-    <div class="lu-card-empty-icon">+</div>
-    <span class="lu-card-tap">${isAdmin ? 'TAP TO PICK' : '—'}</span>
+    <div class="lu-card-empty-icon">${viewOnly?'—':'+'}</div>
+    <span class="lu-card-tap">${viewOnly ? '' : isAdmin ? 'TAP TO PICK' : '—'}</span>
   </div>`;
 }
 
-function renderLuGoalieCard(player, gameId, att) {
+function renderLuGoalieCard(player, gameId, att, viewOnly) {
   const liveGId = `document.getElementById('lineupGameSelect')?.value||'${gameId}'`;
   const isSwapSelG = swapMode && swapSlot1 && swapSlot1.slotKey==='g';
-  const opener = isAdmin
+  const opener = (!viewOnly && isAdmin)
     ? (swapMode
         ? `onclick="handleSwapClick(${liveGId},'g','')"`
         : `onclick="openLineupPickerG(${liveGId})"`)
     : '';
+  if (player) {
+    const notIn = !player.spare && (att[player.id] !== 'in');
+    const av = renderAvatar(player, 'lg', false);
+    return `<div class="lu-card filled goalie-card${notIn?' not-in':''}${isSwapSelG?' swap-selected':''}${viewOnly?' view-only':''}" ${opener} style="${viewOnly?'opacity:0.8;cursor:default;':''}">
+      <span class="lu-card-pos">G</span>
+      <div class="lu-card-av">${av}</div>
+      ${player.spare ? `<span class="lu-spare-lbl">spare</span>` : ''}
+      ${notIn ? `<span class="lu-notin-badge">NOT IN</span>` : ''}
+      <span class="lu-card-name">${esc(player.name)}</span>
+    </div>`;
+  }
+  return `<div class="lu-card empty goalie-card${viewOnly?' view-only':''}" ${opener} style="${viewOnly?'opacity:0.5;cursor:default;':''}">
+    <span class="lu-card-pos">G</span>
+    <div class="lu-card-empty-icon">${viewOnly?'—':'+'}</div>
+    <span class="lu-card-tap">${viewOnly ? '' : isAdmin ? 'TAP TO PICK' : '—'}</span>
+  </div>`;
+}
   if (player) {
     const notIn = !player.spare && (att[player.id] !== 'in');
     const av = renderAvatar(player, 'lg', false);
@@ -2858,12 +2874,14 @@ function renderLineupBuilder(s, games, players) {
       <div class="lineup-empty">Add a game first, then build your lineup here.</div></div>`;
   }
   const today = isoToday();
+  // Default to next upcoming game
   if (!lineupGameId || !findGame(lineupGameId)) {
     const upcoming = games.find(g => g.date >= today);
     lineupGameId = (upcoming || games[games.length - 1]).id;
   }
   const game = findGame(lineupGameId);
   if (!game) return '';
+  const isPastGame = game.date && game.date < today;
   ensureLineup(game.id);
   const lu = state.lineups[game.id];
   const att = state.attendance[game.id] || {};
@@ -2881,17 +2899,18 @@ function renderLineupBuilder(s, games, players) {
     + (lu.g?1:0);
 
   const gameOpts = games.map(g => {
-    const label = `Game ${g.number||''} · ${fmtDateShort(g.date)} ${g.isHome?'vs':'@'} ${g.opponent||'TBD'}`;
-    return `<option value="${g.id}"${g.id===lineupGameId?' selected':''}>${esc(label)}</option>`;
+    const isPast = g.date && g.date < today;
+    const label = `${isPast ? '🔒 ' : ''}Game ${g.number||''} · ${fmtDateShort(g.date)} ${g.isHome?'vs':'@'} ${g.opponent||'TBD'}`;
+    return `<option value="${g.id}"${g.id===lineupGameId?' selected':''}${isPast?' style="color:#999"':''}>${esc(label)}</option>`;
   }).join('');
 
   const fLine = (key, num) => `
     <div class="lu-line">
       <div class="lu-line-lbl">LINE ${num}</div>
       <div class="lu-cards-row">
-        ${renderLuCard(slotPlayer(lu[key].L,players),'LW',game.id,key,'L',att)}
-        ${renderLuCard(slotPlayer(lu[key].C,players),'C',game.id,key,'C',att)}
-        ${renderLuCard(slotPlayer(lu[key].R,players),'RW',game.id,key,'R',att)}
+        ${renderLuCard(slotPlayer(lu[key].L,players),'LW',game.id,key,'L',att,isPastGame)}
+        ${renderLuCard(slotPlayer(lu[key].C,players),'C',game.id,key,'C',att,isPastGame)}
+        ${renderLuCard(slotPlayer(lu[key].R,players),'RW',game.id,key,'R',att,isPastGame)}
       </div>
     </div>`;
 
@@ -2899,8 +2918,8 @@ function renderLineupBuilder(s, games, players) {
     <div class="lu-line">
       <div class="lu-line-lbl">PAIR ${num}</div>
       <div class="lu-cards-row d-row">
-        ${renderLuCard(slotPlayer(lu[key].L,players),'LD',game.id,key,'L',att)}
-        ${renderLuCard(slotPlayer(lu[key].R,players),'RD',game.id,key,'R',att)}
+        ${renderLuCard(slotPlayer(lu[key].L,players),'LD',game.id,key,'L',att,isPastGame)}
+        ${renderLuCard(slotPlayer(lu[key].R,players),'RD',game.id,key,'R',att,isPastGame)}
       </div>
     </div>`;
 
@@ -2910,9 +2929,12 @@ function renderLineupBuilder(s, games, players) {
         <h3>Lineup Builder</h3>
         <select id="lineupGameSelect" onchange="setLineupGame(this.value)" style="width:100%;max-width:100%;min-width:100%;order:10;flex-basis:100%;">${gameOpts}</select>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;width:100%;order:20;">
-          ${isAdmin ? `<button class="btn btn-rust btn-sm" onclick="autoBuildLineup(document.getElementById('lineupGameSelect')?.value||'${game.id}')" title="Auto-fill lineup from attendance + position history">⚡ Auto Build</button>
+          ${isPastGame
+            ? `<span style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;letter-spacing:0.05em;">🔒 PAST GAME — VIEW ONLY</span>`
+            : isAdmin ? `<button class="btn btn-rust btn-sm" onclick="autoBuildLineup(document.getElementById('lineupGameSelect')?.value||'${game.id}')" title="Auto-fill lineup from attendance + position history">⚡ Auto Build</button>
           <button class="btn ${swapMode ? 'btn-rust' : 'btn-ghost'} btn-sm" onclick="toggleSwapMode()" title="Tap two slots to swap players">↔ ${swapMode ? (swapSlot1 ? 'Tap 2nd slot…' : 'Tap a slot') : 'Swap'}</button>
-          <button class="btn btn-ghost btn-sm" onclick="openShareLineup(document.getElementById('lineupGameSelect')?.value||'${game.id}')">📤 Share</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="openShareLineup(document.getElementById('lineupGameSelect')?.value||'${game.id}')">📤 Share</button>` : ''
+          }
         </div>
       </div>
 
@@ -2941,13 +2963,13 @@ function renderLineupBuilder(s, games, players) {
       <div class="lu-section">
         <div class="lu-section-hdr">GOALIE</div>
         <div class="lu-cards-row goalie-row">
-          ${renderLuGoalieCard(slotPlayer(lu.g,players), game.id, att)}
+          ${renderLuGoalieCard(slotPlayer(lu.g,players), game.id, att, isPastGame)}
         </div>
       </div>
 
       <div class="lineup-summary">
         <span><strong>${totalSlots}</strong> in lineup</span>
-        ${isAdmin ? `<span style="margin-left:auto;"><button class="btn btn-ghost btn-sm" onclick="clearLineup(document.getElementById('lineupGameSelect')?.value||'${game.id}')">Clear All</button></span>` : ''}
+        ${isAdmin && !isPastGame ? `<span style="margin-left:auto;"><button class="btn btn-ghost btn-sm" onclick="clearLineup(document.getElementById('lineupGameSelect')?.value||'${game.id}')">Clear All</button></span>` : ''}
       </div>
     </div>
   `;
