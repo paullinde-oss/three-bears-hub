@@ -633,14 +633,19 @@ tr.t-ir .stk     { background:#FFCDD2 !important; }
   .matrix .stk-4{font-size:11px;padding:4px 3px}
 
   /* Beer matrix: show Balance (stk-6) instead of Paid (stk-4) on mobile */
-  .beer-matrix-wrap .stk-4{display:none !important}
-  .beer-matrix-wrap .stk-5{display:none !important}
   .beer-matrix-wrap .stk-5b{display:none !important}
-  .beer-matrix-wrap .stk-6{
+  .beer-matrix-wrap .stk-4{
     display:table-cell !important;
     left:128px !important;
-    width:72px !important;
-    min-width:72px !important;
+    width:58px !important;
+    min-width:58px !important;
+    font-size:11px;
+  }
+  .beer-matrix-wrap .stk-6{
+    display:table-cell !important;
+    left:186px !important;
+    width:65px !important;
+    min-width:65px !important;
     font-size:11px;
   }
 }
@@ -2189,7 +2194,7 @@ function renderBeerMatrix(s, players, games) {
       <td class="stk stk-3" onclick="openProfile('${p.id}')" style="cursor:pointer"><span class="matrix-name-cell" style="display:inline-flex;align-items:center;gap:5px">${renderAvatar(p, 'sm')}<span>${esc(p.name)}</span></span></td>
       
       <td class="stk stk-4" ${isAdmin ? `onclick="openPaymentModal('${p.id}','beer')" style="cursor:pointer;"` : ''}>${fmtCompact(beerPaid)}</td>
-      <td class="stk stk-5">${beerCount}</td>
+      <td class="stk stk-5b">${beerCount}</td>
       <td class="stk stk-6 ${balCls}">${fmtSigned(balance)}</td>`;
     games.forEach(g => {
       const isPast = g.date && g.date < today;
