@@ -2584,7 +2584,7 @@ function renderLuCard(player, posLabel, gameId, slotKey, posKey, att, viewOnly) 
       <span class="lu-card-name">${esc(player.name)}</span>
     </div>`;
   }
-  return `<div class="lu-card empty${viewOnly?' view-only':''}" style="${viewOnly?'opacity:0.5;cursor:default;':''}">
+  return `<div class="lu-card empty${viewOnly?' view-only':''}" ${opener} style="${viewOnly?'opacity:0.5;cursor:default;':''}">
     <span class="lu-card-pos">${posLabel}</span>
     <div class="lu-card-empty-icon">${viewOnly?'—':'+'}</div>
     <span class="lu-card-tap">${viewOnly ? '' : isAdmin ? 'TAP TO PICK' : '—'}</span>
