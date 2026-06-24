@@ -334,7 +334,6 @@ body.is-admin .matrix .carry-cell input:focus{border-color:var(--rust);backgroun
 .lu-card.empty { background:var(--paper-3);border:2.5px dashed var(--line-dark); }
 .lu-card.empty:hover { border-color:var(--rust);border-style:solid;background:white; }
 .lu-card.not-in { border-color:#EF9A9A;background:#FFF5F5; }
-.lu-card.goalie-card { border-color:#81C784;background:#E8F5E9; }
 .lu-card.goalie-card.not-in { border-color:#EF9A9A;background:#FFF5F5; }
 
 .lu-card-pos {
@@ -2567,7 +2566,7 @@ function slotPlayer(slotVal, players) {
 // Render a lineup card (pill-shaped slot)
 function renderLuCard(player, posLabel, gameId, slotKey, posKey, att, viewOnly) {
   const flip = posLabel === 'RW' || posLabel === 'RD';
-  const liveId = `document.getElementById('lineupGameSelect')?.value||'${gameId}'`;
+  const liveId = `getLineupGameId('${gameId}')`;
   const isSwapSel = swapMode && swapSlot1 && swapSlot1.slotKey===slotKey && swapSlot1.posKey===posKey;
   const opener = (!viewOnly && isAdmin)
     ? (swapMode
@@ -2593,7 +2592,7 @@ function renderLuCard(player, posLabel, gameId, slotKey, posKey, att, viewOnly) 
 }
 
 function renderLuGoalieCard(player, gameId, att, viewOnly) {
-  const liveGId = `document.getElementById('lineupGameSelect')?.value||'${gameId}'`;
+  const liveGId = `getLineupGameId('${gameId}')`;
   const isSwapSelG = swapMode && swapSlot1 && swapSlot1.slotKey==='g';
   const opener = (!viewOnly && isAdmin)
     ? (swapMode
@@ -2913,9 +2912,9 @@ function renderLineupBuilder(s, games, players) {
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;width:100%;order:20;">
           ${isPastGame
             ? `<span style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;letter-spacing:0.05em;">🔒 PAST GAME — VIEW ONLY</span>`
-            : isAdmin ? `<button class="btn btn-rust btn-sm" onclick="autoBuildLineup(document.getElementById('lineupGameSelect')?.value||'${game.id}')" title="Auto-fill lineup from attendance + position history">⚡ Auto Build</button>
+            : isAdmin ? `<button class="btn btn-rust btn-sm" onclick="autoBuildLineup(getLineupGameId('${game.id}'))" title="Auto-fill lineup from attendance + position history">⚡ Auto Build</button>
           <button class="btn ${swapMode ? 'btn-rust' : 'btn-ghost'} btn-sm" onclick="toggleSwapMode()" title="Tap two slots to swap players">↔ ${swapMode ? (swapSlot1 ? 'Tap 2nd slot…' : 'Tap a slot') : 'Swap'}</button>
-          <button class="btn btn-ghost btn-sm" onclick="openShareLineup(document.getElementById('lineupGameSelect')?.value||'${game.id}')">📤 Share</button>` : ''
+          <button class="btn btn-ghost btn-sm" onclick="openShareLineup(getLineupGameId('${game.id}'))">📤 Share</button>` : ''
           }
         </div>
       </div>
@@ -2951,12 +2950,16 @@ function renderLineupBuilder(s, games, players) {
 
       <div class="lineup-summary">
         <span><strong>${totalSlots}</strong> in lineup</span>
-        ${isAdmin && !isPastGame ? `<span style="margin-left:auto;"><button class="btn btn-ghost btn-sm" onclick="clearLineup(document.getElementById('lineupGameSelect')?.value||'${game.id}')">Clear All</button></span>` : ''}
+        ${isAdmin && !isPastGame ? `<span style="margin-left:auto;"><button class="btn btn-ghost btn-sm" onclick="clearLineup(getLineupGameId('${game.id}'))">Clear All</button></span>` : ''}
       </div>
     </div>
   `;
 }
 
+
+function getLineupGameId(fallback) {
+  return document.getElementById('lineupGameSelect')?.value || fallback;
+}
 
 function openLineupPicker(gameId, slotKey, posKey) {
   if (!requireAdmin()) return;
