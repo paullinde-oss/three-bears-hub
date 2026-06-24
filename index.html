@@ -536,6 +536,30 @@ tr.t-ir .stk     { background:#FFCDD2 !important; }
 .game-past-locked { opacity:0.85; }
 .game-lock-btn { font-size:11px;margin-top:3px;cursor:pointer;opacity:0.7;line-height:1; }
 .game-lock-btn:hover { opacity:1; }
+.fee-summary-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--paper-2);border-radius:8px;font-size:13px;margin-top:10px;flex-wrap:wrap;}
+.fee-summary-bar .fee-divider{color:var(--line-dark);}
+.fee-summary-bar .fee-warn{color:var(--rust);}
+.fee-summary-bar .fee-good{color:var(--good);}
+.calc-result-box{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:14px;}
+.calc-result-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px;}
+.calc-result-row:last-child{border-bottom:none;}
+.calc-result-row span:first-child{flex:1;color:var(--muted);}
+.calc-result-row strong{font-family:'JetBrains Mono',monospace;font-size:15px;}
+.calc-remainder strong{color:var(--rust);}
+.calc-note{font-size:11px;color:var(--muted);}
+.setup-card{background:var(--paper-2);border:1px solid var(--line);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:14px;}
+.setup-card-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.setup-card-label{font-size:13px;font-weight:600;color:var(--ink);flex:1;}
+.setup-card-hint{font-size:11px;font-weight:400;color:var(--muted);margin-left:6px;}
+.setup-card-input{padding:8px 10px;border:1px solid var(--line);border-radius:7px;font-size:14px;background:var(--paper);color:var(--ink);flex:1;max-width:260px;}
+.setup-card-divider{height:1px;background:var(--line);margin:0 -4px;}
+.setup-card-section-title{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);}
+.setup-card-3col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.setup-card-3col .setup-card-input{max-width:100%;width:100%;}
+.slot-badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600;background:var(--paper-3);color:var(--muted);margin-left:4px;}
+.slot-badge.full{background:#C8E6C9;color:#1B5E20;}
+.slot-badge.over{background:#FFCDD2;color:#8E2424;}
+@media(max-width:720px){.setup-card-row{flex-direction:column;align-items:flex-start;}.setup-card-input{max-width:100%;width:100%;}.setup-card-3col{grid-template-columns:1fr;}}
 /* PWA Install Banner */
 #pwa-banner{position:fixed;bottom:0;left:0;right:0;z-index:10000;background:var(--ink);color:var(--paper);padding:12px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 -4px 20px rgba(0,0,0,0.35);transform:translateY(100%);transition:transform 0.3s ease;}
 #pwa-banner.visible{transform:translateY(0);}
@@ -1487,7 +1511,89 @@ function scrollToRecentGame() {
   wrap.scrollLeft = Math.max(0, scrollTo);
 }
 
-// =============== HEADER / TAB ROUTER ===============
+function calcFees() {
+  const s = activeSeason();
+  if (!s) return;
+  const feesEl = document.getElementById('calc-fees');
+  const ftEl = document.getElementById('calc-ft');
+  const ptEl = document.getElementById('calc-pt');
+  const fees = parseFloat(feesEl?.value);
+  const ft = parseInt(ftEl?.value);
+  const pt = parseInt(ptEl?.value);
+  if (!fees || isNaN(fees)) { toast('Enter Team Fees first', 'bad'); return; }
+  if (isNaN(ft) || isNaN(pt)) { toast('Enter FT and PT spot counts first', 'bad'); return; }
+  const units = ft + (pt * 0.5);
+  if (units === 0) { toast('FT and PT cannot both be 0', 'bad'); return; }
+  const ftFee = Math.round(fees / units);
+  const ptFee = Math.round(ftFee / 2);
+  const allocated = (ft * ftFee) + (pt * ptFee);
+  const remainder = Math.round((fees - allocated) * 100) / 100;
+  const gmId = state.team?.gmPlayerId;
+  const gmPlayer = gmId ? seasonPlayers(s.id).find(p => p.id === gmId) : null;
+  const gmFee = gmPlayer ? (gmPlayer.type === 'full' ? ftFee : ptFee) + remainder : null;
+  document.getElementById('calc-result').innerHTML = `
+    <div class="calc-result-box">
+      <div class="calc-result-row"><span>Full Time Fee</span><strong>${fmt(ftFee)}</strong><span style="font-size:11px;color:var(--muted);">× ${ft} players = ${fmt(ft*ftFee)}</span></div>
+      <div class="calc-result-row"><span>Part Time Fee</span><strong>${fmt(ptFee)}</strong><span style="font-size:11px;color:var(--muted);">× ${pt} players = ${fmt(pt*ptFee)}</span></div>
+      ${Math.abs(remainder) > 0.001 ? `<div class="calc-result-row calc-remainder">
+        <span>${gmPlayer ? esc(gmPlayer.name) + ' (GM)' : 'GM'} pays</span>
+        <strong>${gmFee !== null ? fmt(gmFee) : fmt(ftFee) + ' + ' + fmt(remainder)}</strong>
+        <span style="font-size:11px;color:var(--muted);">${fmt(remainder)} remainder</span>
+      </div>` : ''}
+      <div class="calc-result-row" style="border-top:2px solid var(--line);margin-top:4px;padding-top:8px;">
+        <span>Total</span><strong style="color:${Math.abs(fees-allocated-remainder)<0.01?'var(--good)':'var(--rust)'};">${fmt(fees)}</strong>
+      </div>
+      <button class="btn btn-rust" style="margin-top:12px;width:100%;" onclick="applyFees(${ftFee},${ptFee},${remainder},${fees},${ft},${pt})">✓ Apply to All Players</button>
+    </div>`;
+}
+
+async function applyFees(ftFee, ptFee, remainder, totalFees, ftCount, ptCount) {
+  const s = activeSeason();
+  if (!s) return;
+  const gmId = state.team?.gmPlayerId;
+  const players = seasonPlayers(s.id);
+  let applied = 0;
+  players.forEach(p => {
+    const re = state.rosters[s.id][p.id];
+    if (!re) return;
+    if (p.type === 'full') { re.allocated = ftFee; applied++; }
+    else if (p.type === 'part') { re.allocated = ptFee; applied++; }
+    else { re.allocated = 0; }
+  });
+  // Assign remainder to GM player
+  if (gmId && Math.abs(remainder) > 0) {
+    const gmRe = state.rosters[s.id][gmId];
+    if (gmRe && (gmRe.type === 'full' || gmRe.type === 'part')) {
+      const base = gmRe.type === 'full' ? ftFee : ptFee;
+      gmRe.allocated = Math.round((base + remainder) * 100) / 100;
+    }
+  }
+  // Save season fee defaults
+  updateSeasonField(s.id, 'teamFees', totalFees);
+  updateSeasonField(s.id, 'fullTimeDefault', ftFee);
+  updateSeasonField(s.id, 'partTimeDefault', ptFee);
+  updateSeasonField(s.id, 'ftCount', ftCount);
+  updateSeasonField(s.id, 'ptCount', ptCount);
+  await saveState();
+  toast(`✅ Fees applied to ${applied} players${gmId ? ' · GM gets remainder' : ''}`, 'good');
+  render();
+}
+
+async function setGmPlayer(playerId) {
+  if (!state.team) state.team = {};
+  state.team.gmPlayerId = playerId;
+  await saveState();
+  toast('GM player set ✓', 'good');
+}
+
+function getRosterSlotCounts(sId) {
+  const players = seasonPlayers(sId);
+  const ft = players.filter(p => p.type === 'full').length;
+  const pt = players.filter(p => p.type === 'part').length;
+  return { ft, pt };
+}
+
+// =============== END FEE CALCULATOR ===============
 function renderHeader() {
   const name = state.team.name || 'Team';
   const parts = name.split(' ');
@@ -1684,9 +1790,8 @@ function renderDashboard() {
   const games = [...pastFbGames, ...snGames].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const isLive = snGames.length > 0;
 
-  const totalAllocated = players.reduce((sum, p) => sum + (parseFloat(p.allocated) || 0), 0);
   const totalPaid = players.reduce((sum, p) => sum + playerPaymentsSum(p.id, s.id, 'team'), 0);
-  const leftToAllocate = (parseFloat(s.teamFees) || 0) - totalAllocated;
+  const totalAllocated = players.reduce((sum, p) => sum + (parseFloat(p.allocated) || 0), 0);
   const leftToPay = totalAllocated - totalPaid;
 
   const typeOrder = { full:1, part:2, sub:3, spare:4, goalie:5, ir:6 };
@@ -1697,12 +1802,7 @@ function renderDashboard() {
   });
 
   return `
-    <div class="stats-row">
-      <div class="stat accent"><div class="lbl">Team Fees</div><div class="val">${fmtCompact(s.teamFees)}</div><div class="note">${esc(s.name)}</div></div>
-      <div class="stat"><div class="lbl">Paid</div><div class="val">${fmtCompact(totalPaid)}</div><div class="note">of ${fmtCompact(totalAllocated)} allocated</div></div>
-      <div class="stat ${leftToPay > 0 ? 'warn' : ''}"><div class="lbl">Left to Pay</div><div class="val">${fmtCompact(leftToPay)}</div><div class="note">${players.length} player${players.length === 1 ? '' : 's'} · ${games.length} game${games.length === 1 ? '' : 's'}</div></div>
-      <div class="stat ${Math.abs(leftToAllocate) > 0.01 ? 'warn' : ''}"><div class="lbl">Need to Allocate</div><div class="val">${fmtCompact(leftToAllocate)}</div><div class="note">${leftToAllocate > 0 ? 'short of team fees' : leftToAllocate < 0 ? 'over-allocated' : 'fully allocated'}</div></div>
-    </div>
+
 
     <div class="action-bar">
       ${isAdmin ? `<button class="btn btn-rust" onclick="openAddPlayer()">+ Add Player</button>
@@ -1722,6 +1822,12 @@ function renderDashboard() {
       <span class="legend-item"><span class="legend-sw cut">✓</span> Said In, Cut</span>
     </div>
 
+    <div class="fee-summary-bar">
+      <span class="${leftToPay > 0.01 ? 'fee-warn' : 'fee-good'}">${leftToPay > 0.01 ? '⚠️' : '✓'} Left to Pay <strong>${fmtCompact(leftToPay)}</strong></span>
+      <span class="fee-divider">·</span>
+      <span style="color:var(--muted);">${players.length} players · ${games.length} games</span>
+    </div>
+
     ${renderLineupBuilder(s, games, players)}
   `;
 }
@@ -1732,8 +1838,8 @@ function renderMatrix(s, players, games) {
 
   let head = `<tr>
     <th class="stk stk-2">Pos</th><th class="stk stk-3">Name</th>
-    <th class="stk stk-4">J#</th><th class="stk stk-5 mob-hide">Allocated</th><th class="stk stk-6 mob-hide">Paid</th>
-    <th class="stk stk-7">Balance</th>`;
+    <th class="stk stk-4">J#</th><th class="stk stk-5 mob-hide">Paid</th>
+    <th class="stk stk-6">Balance</th>`;
   games.forEach((g, idx) => {
     const us = parseInt(g.ourScore), them = parseInt(g.theirScore);
     const hasScore2 = !isNaN(us) && !isNaN(them);
@@ -1777,9 +1883,8 @@ function renderMatrix(s, players, games) {
       <td class="stk stk-2">${esc(p.position || '')}</td>
       <td class="stk stk-3" onclick="openProfile('${p.id}')" style="cursor:pointer"><span class="matrix-name-cell" style="display:inline-flex;align-items:center;gap:5px">${renderAvatar(p, 'sm')}<span>${esc(p.name)}</span></span></td>
       <td class="stk stk-4">${esc(p.jerseyNumber || '')}</td>
-      <td class="stk stk-5 mob-hide">${fmtCompact(allocated)}</td>
-      <td class="stk stk-6" ${isAdmin ? `onclick="openPaymentModal('${p.id}','team')" style="cursor:pointer;" title="Click to record payment"` : ''}>${fmtCompact(paid)}</td>
-      <td class="stk stk-7 ${balCls}">${balTxt}</td>`;
+      <td class="stk stk-5 mob-hide" ${isAdmin ? `onclick="openPaymentModal('${p.id}','team')" style="cursor:pointer;" title="Click to record payment"` : ''}>${fmtCompact(paid)}</td>
+      <td class="stk stk-6 ${balCls}">${balTxt}</td>`;
     games.forEach(g => {
       const isPast = g.date && g.date < today;
       const isUnlocked = unlockedPastGames.has(g.id);
@@ -1798,7 +1903,7 @@ function renderMatrix(s, players, games) {
   const avgBodies = pastGames.length === 0 ? '—' : (pastGames.reduce((sum, g) => sum + bodiesForGame(g.id, s.id), 0) / pastGames.length).toFixed(1);
   const bodiesRow = `<tr class="bodies-row">
     <td class="stk stk-2" colspan="2" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:6px 12px;">Bodies</td>
-    <td class="stk stk-4"></td><td class="stk stk-5 mob-hide"></td><td class="stk stk-6 mob-hide"></td><td class="stk stk-7"></td>
+    <td class="stk stk-4"></td><td class="stk stk-5 mob-hide"></td><td class="stk stk-6"></td>
     ${games.map(g => `<td style="text-align:center;font-size:12px;font-weight:600;">${bodiesForGame(g.id, s.id)||''}</td>`).join('')}
     <td colspan="2" style="text-align:center;font-size:11px;opacity:0.6;">avg ${avgBodies}</td></tr>`;
 
@@ -2356,7 +2461,23 @@ function openEditPlayer(playerId) {
       p.startingBeerBalance = parseFloat(f.get('startingBeerBalance')) || 0;
       p.photo = document.getElementById('editPhotoData').value || '';
       if (onRoster) {
-        re.type = f.get('type');
+        const newType = f.get('type');
+        const s = activeSeason();
+        // Check slot caps
+        if (s && newType !== re.type) {
+          const counts = getRosterSlotCounts(s.id);
+          const ftCap = parseInt(s.ftCount) || 0;
+          const ptCap = parseInt(s.ptCount) || 0;
+          if (newType === 'full' && ftCap > 0 && counts.ft >= ftCap && re.type !== 'full') {
+            toast(`⚠️ FT slots full (${counts.ft}/${ftCap}) — update Season Setup to add more`, 'bad');
+            return;
+          }
+          if (newType === 'part' && ptCap > 0 && counts.pt >= ptCap && re.type !== 'part') {
+            toast(`⚠️ PT slots full (${counts.pt}/${ptCap}) — update Season Setup to add more`, 'bad');
+            return;
+          }
+        }
+        re.type = newType;
         re.jerseyNumber = f.get('jerseyNumber').trim();
         re.hasJersey = !!re.jerseyNumber;
         re.allocated = parseFloat(f.get('allocated')) || 0;
@@ -3323,7 +3444,7 @@ function sendInOutWhatsApp(gameId) {
 function renderSettings() {
   const sCurrent = activeSeason();
   const disabled = !isAdmin ? 'disabled' : '';
-  const seasonHead = `<div class="season-row head"><div>Name</div><div>Team Fees</div><div>FT Default</div><div>PT Default</div><div></div></div>`;
+  const seasonHead = `<div class="season-row head"><div>Name</div><div>Team Fees</div><div></div></div>`;
   const seasonRows = state.seasons.map(s => `
     <div class="season-row ${s.archived ? 'archived' : ''}">
       <div>
@@ -3331,8 +3452,6 @@ function renderSettings() {
         ${s.archived ? '<span class="pill" style="margin-top:4px;display:inline-block;">archived</span>' : ''}
       </div>
       <input type="number" value="${s.teamFees || 0}" step="0.01" min="0" onchange="updateSeasonField('${s.id}','teamFees',this.value)" ${disabled}>
-      <input type="number" value="${s.fullTimeDefault || 0}" step="0.01" min="0" onchange="updateSeasonField('${s.id}','fullTimeDefault',this.value)" ${disabled}>
-      <input type="number" value="${s.partTimeDefault || 0}" step="0.01" min="0" onchange="updateSeasonField('${s.id}','partTimeDefault',this.value)" ${disabled}>
       <div style="display:flex;gap:4px;">
         ${isAdmin ? `<button class="btn-icon" onclick="toggleArchiveSeason('${s.id}')" title="${s.archived ? 'Unarchive' : 'Archive'}">${s.archived ? '↺' : '📦'}</button>
         <button class="btn-icon btn-danger" onclick="deleteSeason('${s.id}')" title="Delete">✕</button>` : ''}
@@ -3383,10 +3502,65 @@ function renderSettings() {
       <div class="help-text"><strong>New Season (copy players)</strong> brings all current players over with their types &amp; jersey numbers, resets team fee allocations, no games yet. Beer carry balances stay attached to each player globally.<br><strong>Archive</strong> 📦 hides a season under "Archived" but keeps the data.</div>
     </div>
     <div class="settings-section">
-      <h4>Active Season — ${esc(sCurrent?.name || '')}</h4>
-      <div class="field-row">
-        <div class="field"><label>Playoff Eligibility (min games)</label><input type="number" value="${sCurrent?.playoffMinGames || 4}" min="0" onchange="updateSeasonField('${sCurrent.id}','playoffMinGames',this.value)" ${disabled}></div>
-      </div>
+      <h4>Season Setup — ${esc(sCurrent?.name || '')}</h4>
+      ${!isAdmin ? '<div class="help-text">Admin only.</div>' : (() => {
+        const slotCounts = getRosterSlotCounts(sCurrent?.id || '');
+        const ftCap = parseInt(sCurrent?.ftCount) || 0;
+        const ptCap = parseInt(sCurrent?.ptCount) || 0;
+        const ftUsed = slotCounts.ft;
+        const ptUsed = slotCounts.pt;
+        const allPlayers = seasonPlayers(sCurrent?.id || '');
+        const gmId = state.team?.gmPlayerId || '';
+        const gmPlayer = allPlayers.find(p => p.id === gmId);
+        return `<div class="setup-card">
+
+          <div class="setup-card-row">
+            <div class="setup-card-label">Season Name</div>
+            <input type="text" class="setup-card-input" value="${esc(sCurrent?.name||'')}" onchange="updateSeasonField('${sCurrent.id}','name',this.value)" placeholder="e.g. Summer 2027">
+          </div>
+
+          <div class="setup-card-divider"></div>
+
+          <div class="setup-card-row">
+            <div class="setup-card-label">GM Player <span class="setup-card-hint">receives remainder cents</span></div>
+            <select class="setup-card-input" onchange="setGmPlayer(this.value)">
+              <option value="">— Select GM —</option>
+              ${allPlayers.map(p => `<option value="${p.id}"${p.id===gmId?' selected':''}>${esc(p.name)}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="setup-card-divider"></div>
+
+          <div class="setup-card-section-title">Fee Calculator</div>
+
+          <div class="setup-card-3col">
+            <div>
+              <div class="setup-card-label">Team Fees ($)</div>
+              <input type="number" id="calc-fees" class="setup-card-input" step="0.01" min="0" value="${sCurrent?.teamFees||''}" placeholder="6298.95" oninput="document.getElementById('calc-result').innerHTML=''">
+            </div>
+            <div>
+              <div class="setup-card-label">Full Time Spots ${ftCap>0?`<span class="slot-badge ${ftUsed>ftCap?'over':ftUsed===ftCap?'full':''}">${ftUsed}/${ftCap}</span>`:''}</div>
+              <input type="number" id="calc-ft" class="setup-card-input" min="0" value="${sCurrent?.ftCount||''}" placeholder="11" oninput="document.getElementById('calc-result').innerHTML=''">
+            </div>
+            <div>
+              <div class="setup-card-label">Part Time Spots ${ptCap>0?`<span class="slot-badge ${ptUsed>ptCap?'over':ptUsed===ptCap?'full':''}">${ptUsed}/${ptCap}</span>`:''}</div>
+              <input type="number" id="calc-pt" class="setup-card-input" min="0" value="${sCurrent?.ptCount||''}" placeholder="5" oninput="document.getElementById('calc-result').innerHTML=''">
+            </div>
+          </div>
+
+          <button class="btn btn-rust" onclick="calcFees()" style="margin-top:12px;">Calculate Fees</button>
+          <div id="calc-result" style="margin-top:14px;"></div>
+
+          <div class="setup-card-divider"></div>
+
+          <div class="setup-card-row">
+            <div class="setup-card-label">Playoff Eligibility <span class="setup-card-hint">minimum games</span></div>
+            <input type="number" class="setup-card-input" style="max-width:80px;" value="${sCurrent?.playoffMinGames||4}" min="0" onchange="updateSeasonField('${sCurrent.id}','playoffMinGames',this.value)">
+          </div>
+
+        </div>
+        <div class="help-text" style="margin-top:8px;">PT players pay half of FT. Super Subs, Goalies and IR get $0. Remainder cents go to the GM player automatically.</div>`;
+      })()}
     </div>
     <div class="settings-section">
       <h4>Sharing</h4>
