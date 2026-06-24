@@ -1524,24 +1524,30 @@ function calcFees() {
   if (isNaN(ft) || isNaN(pt)) { toast('Enter FT and PT spot counts first', 'bad'); return; }
   const units = ft + (pt * 0.5);
   if (units === 0) { toast('FT and PT cannot both be 0', 'bad'); return; }
-  const ftFee = Math.round(fees / units);
-  const ptFee = Math.round(ftFee / 2);
-  const allocated = (ft * ftFee) + (pt * ptFee);
-  const remainder = Math.round((fees - allocated) * 100) / 100;
+
+  // Calculate from raw unit value to avoid rounding errors
+  const rawUnit = fees / units;
+  const ftFee = Math.round(rawUnit);           // FT pays one unit, rounded
+  const ptFee = Math.round(rawUnit / 2);       // PT pays half unit, rounded independently
+  const baseTotal = (ft * ftFee) + (pt * ptFee);
+  const remainder = Math.round((fees - baseTotal) * 100) / 100;  // what's left for GM
+
   const gmId = state.team?.gmPlayerId;
   const gmPlayer = gmId ? seasonPlayers(s.id).find(p => p.id === gmId) : null;
-  const gmFee = gmPlayer ? (gmPlayer.type === 'full' ? ftFee : ptFee) + remainder : null;
+  const gmBase = gmPlayer?.type === 'part' ? ptFee : ftFee;
+  const gmFee = Math.round((gmBase + remainder) * 100) / 100;
+
   document.getElementById('calc-result').innerHTML = `
     <div class="calc-result-box">
-      <div class="calc-result-row"><span>Full Time Fee</span><strong>${fmt(ftFee)}</strong><span style="font-size:11px;color:var(--muted);">× ${ft} players = ${fmt(ft*ftFee)}</span></div>
-      <div class="calc-result-row"><span>Part Time Fee</span><strong>${fmt(ptFee)}</strong><span style="font-size:11px;color:var(--muted);">× ${pt} players = ${fmt(pt*ptFee)}</span></div>
+      <div class="calc-result-row"><span>Full Time Fee</span><strong>${fmt(ftFee)}</strong><span style="font-size:11px;color:var(--muted);">× ${ft} = ${fmt(ft*ftFee)}</span></div>
+      <div class="calc-result-row"><span>Part Time Fee</span><strong>${fmt(ptFee)}</strong><span style="font-size:11px;color:var(--muted);">× ${pt} = ${fmt(pt*ptFee)}</span></div>
       ${Math.abs(remainder) > 0.001 ? `<div class="calc-result-row calc-remainder">
-        <span>${gmPlayer ? esc(gmPlayer.name) + ' (GM)' : 'GM'} pays</span>
-        <strong>${gmFee !== null ? fmt(gmFee) : fmt(ftFee) + ' + ' + fmt(remainder)}</strong>
-        <span style="font-size:11px;color:var(--muted);">${fmt(remainder)} remainder</span>
+        <span>${gmPlayer ? esc(gmPlayer.name) + ' (GM)' : 'GM player'} pays</span>
+        <strong>${fmt(gmFee)}</strong>
+        <span style="font-size:11px;color:var(--muted);">${remainder >= 0 ? '+' : ''}${fmt(remainder)} remainder</span>
       </div>` : ''}
       <div class="calc-result-row" style="border-top:2px solid var(--line);margin-top:4px;padding-top:8px;">
-        <span>Total</span><strong style="color:${Math.abs(fees-allocated-remainder)<0.01?'var(--good)':'var(--rust)'};">${fmt(fees)}</strong>
+        <span>Total</span><strong style="color:var(--good);">${fmt(fees)}</strong>
       </div>
       <button class="btn btn-rust" style="margin-top:12px;width:100%;" onclick="applyFees(${ftFee},${ptFee},${remainder},${fees},${ft},${pt})">✓ Apply to All Players</button>
     </div>`;
@@ -3515,13 +3521,6 @@ function renderSettings() {
         return `<div class="setup-card">
 
           <div class="setup-card-row">
-            <div class="setup-card-label">Season Name</div>
-            <input type="text" class="setup-card-input" value="${esc(sCurrent?.name||'')}" onchange="updateSeasonField('${sCurrent.id}','name',this.value)" placeholder="e.g. Summer 2027">
-          </div>
-
-          <div class="setup-card-divider"></div>
-
-          <div class="setup-card-row">
             <div class="setup-card-label">GM Player <span class="setup-card-hint">receives remainder cents</span></div>
             <select class="setup-card-input" onchange="setGmPlayer(this.value)">
               <option value="">— Select GM —</option>
@@ -3536,15 +3535,15 @@ function renderSettings() {
           <div class="setup-card-3col">
             <div>
               <div class="setup-card-label">Team Fees ($)</div>
-              <input type="number" id="calc-fees" class="setup-card-input" step="0.01" min="0" value="${sCurrent?.teamFees||''}" placeholder="6298.95" oninput="document.getElementById('calc-result').innerHTML=''">
+              <input type="number" id="calc-fees" class="setup-card-input" step="0.01" min="0" value="${sCurrent?.teamFees||''}" placeholder="" oninput="document.getElementById('calc-result').innerHTML=''">
             </div>
             <div>
               <div class="setup-card-label">Full Time Spots ${ftCap>0?`<span class="slot-badge ${ftUsed>ftCap?'over':ftUsed===ftCap?'full':''}">${ftUsed}/${ftCap}</span>`:''}</div>
-              <input type="number" id="calc-ft" class="setup-card-input" min="0" value="${sCurrent?.ftCount||''}" placeholder="11" oninput="document.getElementById('calc-result').innerHTML=''">
+              <input type="number" id="calc-ft" class="setup-card-input" min="0" value="${sCurrent?.ftCount||''}" placeholder="" oninput="document.getElementById('calc-result').innerHTML=''">
             </div>
             <div>
               <div class="setup-card-label">Part Time Spots ${ptCap>0?`<span class="slot-badge ${ptUsed>ptCap?'over':ptUsed===ptCap?'full':''}">${ptUsed}/${ptCap}</span>`:''}</div>
-              <input type="number" id="calc-pt" class="setup-card-input" min="0" value="${sCurrent?.ptCount||''}" placeholder="5" oninput="document.getElementById('calc-result').innerHTML=''">
+              <input type="number" id="calc-pt" class="setup-card-input" min="0" value="${sCurrent?.ptCount||''}" placeholder="" oninput="document.getElementById('calc-result').innerHTML=''">
             </div>
           </div>
 
