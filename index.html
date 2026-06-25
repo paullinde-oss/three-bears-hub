@@ -534,6 +534,8 @@ tr.t-ir .stk     { background:#FFCDD2 !important; }
 .att.cut { background:var(--cut-bg) !important;color:var(--cut-text) !important; }
 .att.att-locked { opacity:0.6;cursor:default !important; }
 .game-past-locked { opacity:0.85; }
+.game-history-only { opacity:0.7; background:var(--paper-2) !important; }
+.beer-cell.history-only input { opacity:0.7; }
 .game-lock-btn { font-size:11px;margin-top:3px;cursor:pointer;opacity:0.7;line-height:1; }
 .game-lock-btn:hover { opacity:1; }
 .fee-summary-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--paper-2);border-radius:8px;font-size:13px;margin-top:10px;flex-wrap:wrap;}
@@ -1416,9 +1418,25 @@ function beersForGame(gId) {
   const b = state.beers[gId] || {};
   return Object.values(b).reduce((s, n) => s + (parseInt(n) || 0), 0);
 }
+function isFinancialGame(gId) {
+  // Firebase games (G1-7) are history-only — not counted in balance
+  // SportNinja games (G8+) count financially
+  const inFirebase = state.games.some(g => g.id === gId);
+  return !inFirebase; // only non-Firebase (SportNinja) games count financially
+}
+
 function totalBeersForPlayer(pId) {
   let total = 0;
   Object.keys(state.beers).forEach(gId => { total += parseInt((state.beers[gId] || {})[pId]) || 0; });
+  return total;
+}
+
+function financialBeersForPlayer(pId) {
+  // Only count beers from G8+ (SportNinja games) towards balance
+  let total = 0;
+  Object.keys(state.beers).forEach(gId => {
+    if (isFinancialGame(gId)) total += parseInt((state.beers[gId] || {})[pId]) || 0;
+  });
   return total;
 }
 function gamesPlayedAllTime(pId) {
@@ -1438,7 +1456,7 @@ function avgBeersPerGame(pId) {
 function beerBalanceFor(pId) {
   const p = state.players.find(x => x.id === pId);
   if (!p) return 0;
-  return (parseFloat(p.startingBeerBalance) || 0) + playerPaymentsSum(pId, null, 'beer') - (totalBeersForPlayer(pId) * (state.pricePerBeer || 0));
+  return (parseFloat(p.startingBeerBalance) || 0) + playerPaymentsSum(pId, null, 'beer') - (financialBeersForPlayer(pId) * (state.pricePerBeer || 0));
 }
 
 // =============== UTILS ===============
@@ -2142,7 +2160,7 @@ function renderBeerBank() {
       <span class="legend-item"><span class="legend-sw" style="background:var(--beer-4);color:white;">4</span></span>
       <span class="legend-item"><span class="legend-sw" style="background:var(--beer-5);color:white;">5+</span></span>
       <span style="margin:0 8px;color:var(--line-dark);">|</span>
-      <span>Balance = Carry + Paid − (Beers × ${fmt(state.pricePerBeer)})</span>
+      <span style="font-size:11px;color:var(--muted);">G1–G7 = history only (stats only, not counted in balance) · G8+ counted in balance</span>
     </div>
   `;
 }
@@ -2157,11 +2175,13 @@ function renderBeerMatrix(s, players, games) {
   games.forEach((g, idx) => {
     const isPast = g.date && g.date < today;
     const isUnlocked = unlockedPastGames.has(g.id);
+    const isHistoryOnly = !isFinancialGame(g.id);
     const lockBtn = isPast && isAdmin ? `<div class="game-lock-btn" onclick="event.stopPropagation();toggleGameLock('${g.id}')" title="${isUnlocked ? 'Lock' : 'Unlock to edit'}">${isUnlocked ? '🔓' : '🔒'}</div>` : '';
-    head += `<th class="game-col${isPast && !isUnlocked ? ' game-past-locked' : ''}" title="${esc(g.opponent || 'TBD')}">
+    head += `<th class="game-col${isPast && !isUnlocked ? ' game-past-locked' : ''}${isHistoryOnly ? ' game-history-only' : ''}" title="${esc(g.opponent || 'TBD')}${isHistoryOnly ? ' (history only — not counted in balance)' : ''}">
       <div class="gnum">GAME ${g.number || idx + 1}</div>
       <div class="gdate">${fmtDayShort(g.date)} ${fmtDateTiny(g.date)}</div>
       <div class="gopp">${esc(g.opponent || 'TBD')}</div>
+      ${isHistoryOnly ? '<div style="font-size:9px;opacity:0.6;margin-top:2px;">HISTORY</div>' : ''}
       ${lockBtn}
     </th>`;
   });
@@ -2192,21 +2212,22 @@ function renderBeerMatrix(s, players, games) {
     body += `<tr class="t-${p.type}" data-pid="${p.id}" style="background:${rowTint}">
       <td class="stk stk-2">${esc(p.position || '')}</td>
       <td class="stk stk-3" onclick="openProfile('${p.id}')" style="cursor:pointer"><span class="matrix-name-cell" style="display:inline-flex;align-items:center;gap:5px">${renderAvatar(p, 'sm')}<span>${esc(p.name)}</span></span></td>
-      
       <td class="stk stk-4" ${isAdmin ? `onclick="openPaymentModal('${p.id}','beer')" style="cursor:pointer;"` : ''}>${fmtCompact(beerPaid)}</td>
       <td class="stk stk-5b">${beerCount}</td>
       <td class="stk stk-6 ${balCls}">${fmtSigned(balance)}</td>`;
     games.forEach(g => {
       const isPast = g.date && g.date < today;
       const isUnlocked = unlockedPastGames.has(g.id);
+      const isHistoryOnly = !isFinancialGame(g.id);
       const editable = isAdmin && (!isPast || isUnlocked);
       const beers = parseInt((state.beers[g.id] || {})[p.id]) || 0;
       const att = (state.attendance[g.id] || {})[p.id];
       const wasIn = att === 'in';
       const bucket = beers >= 5 ? 'b-5' : 'b-' + beers;
-      const cls = (wasIn ? 'beer-cell ' + bucket : 'beer-cell not-in') + (isPast && !isUnlocked ? ' att-locked' : '');
+      const emptyCellBg = !wasIn ? `style="background:${rowTint}"` : '';
+      const cls = `beer-cell${wasIn ? ' ' + bucket : ' not-in'}${isPast && !isUnlocked ? ' att-locked' : ''}${isHistoryOnly ? ' history-only' : ''}`;
       const display = wasIn ? (beers || '') : '';
-      body += `<td class="${cls}"><input type="number" min="0" max="99" value="${display}" ${wasIn && editable ? `onchange="updateBeer('${g.id}','${p.id}',this.value)"` : 'readonly disabled'} title="${wasIn ? esc(p.name) + ' — Game ' + (g.number || '') : 'Not IN'}${isPast && !isUnlocked ? ' (locked)' : ''}"></td>`;
+      body += `<td class="${cls}" ${emptyCellBg}><input type="number" min="0" max="99" value="${display}" ${wasIn && editable ? `onchange="updateBeer('${g.id}','${p.id}',this.value)"` : 'readonly disabled'} title="${wasIn ? esc(p.name) + ' — Game ' + (g.number || '') : 'Not IN'}${isPast && !isUnlocked ? ' (locked)' : ''}${isHistoryOnly ? ' (history only)' : ''}"></td>`;
     });
     body += `<td class="games-played ${beerCount === 0 ? 'zero' : ''}">${avg.toFixed(1)}</td></tr>`;
   });
@@ -2597,7 +2618,9 @@ function openPaymentModal(playerId, fund) {
       const f = new FormData(e.target);
       const finalPlayerId = playerId || f.get('playerId');
       if (!finalPlayerId) { toast('Pick a player', 'bad'); return; }
-      state.payments.push({ id: uid(), playerId: finalPlayerId, seasonId: s.id, fund: f.get('fund'),
+      state.payments.push({ id: uid(), playerId: finalPlayerId,
+        seasonId: f.get('fund') === 'beer' ? null : s.id,  // beer payments are global, not season-specific
+        fund: f.get('fund'),
         date: f.get('date'), amount: parseFloat(f.get('amount')) || 0, method: f.get('method'), notes: f.get('notes').trim() });
       await saveState();
       toast('Payment recorded', 'good'); closeModal(); render();
@@ -3618,12 +3641,12 @@ Tyler,D,spare,,0,0,</pre>
     <div class="settings-section">
       <h4>Backup &amp; Restore</h4>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn" onclick="exportData()">↓ Export JSON Backup</button>
+        <button class="btn btn-rust" onclick="exportData()" style="display:inline-flex;align-items:center;gap:6px;">📦 Export JSON Backup</button>
         ${isAdmin ? `<button class="btn btn-ghost" onclick="document.getElementById('importFile').click()">↑ Import JSON</button>
         <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importData(this)">
         <button class="btn btn-ghost btn-danger" onclick="resetAll()" style="margin-left:auto;">Reset Everything</button>` : ''}
       </div>
-      <div class="help-text">Export periodically to keep a backup somewhere safe.</div>
+      <div class="help-text" style="color:var(--rust);font-weight:600;margin-top:6px;">⚠️ Export regularly — especially before creating a new season. This is your only way to recover data.</div>
     </div>
   `;
 }
@@ -3710,7 +3733,7 @@ async function deleteSeason(id) {
   const toRemove = state.games.filter(g => g.seasonId === id).map(g => g.id);
   state.games = state.games.filter(g => g.seasonId !== id);
   toRemove.forEach(gid => { delete state.attendance[gid]; delete state.beers[gid]; delete state.lineups[gid]; });
-  state.payments = state.payments.filter(p => p.seasonId !== id);
+  state.payments = state.payments.filter(p => p.seasonId !== id || p.fund === 'beer');
   if (state.activeSeasonId === id) state.activeSeasonId = state.seasons[0].id;
   await saveState(); toast('Season deleted', 'good'); render();
 }
@@ -3721,6 +3744,10 @@ async function newSeason() {
   if (!cur) { newBlankSeason(); return; }
   const name = prompt('New season name:', 'SUMMER ' + (new Date().getFullYear() + 1));
   if (!name) return;
+
+  // Auto-backup before creating new season
+  exportData();
+  toast('📦 Backup downloaded first — keep it safe!', 'good');
 
   const newS = { id: uid(), name, teamFees: cur.teamFees, playoffMinGames: cur.playoffMinGames,
     fullTimeDefault: cur.fullTimeDefault, partTimeDefault: cur.partTimeDefault, archived: false };
@@ -3744,25 +3771,14 @@ async function newSeason() {
 
   state.activeSeasonId = newS.id;
 
-  // Carry over beer balances automatically
-  const pidSet = new Set(playerIds);
-
-  // Set each player's startingBeerBalance to their ending balance
+  // Carry over beer balances automatically — read from history, DON'T wipe anything
   playerIds.forEach(pid => {
     const p = state.players.find(x => x.id === pid);
     if (p) p.startingBeerBalance = Math.round((endingBeerBal[pid] || 0) * 100) / 100;
   });
 
-  // Clear old beer payments for these players (so formula doesn't double-count)
-  state.payments = state.payments.filter(p => !(p.fund === 'beer' && pidSet.has(p.playerId)));
-
-  // Clear beer consumption for the old season's games
-  const oldGameIds = seasonGames(cur.id).map(g => g.id);
-  oldGameIds.forEach(gId => {
-    if (state.beers[gId]) {
-      pidSet.forEach(pid => { delete state.beers[gId][pid]; });
-    }
-  });
+  // DO NOT clear beer payments or beer counts — history stays intact forever
+  // The startingBeerBalance above accounts for the carry-over correctly
 
   await saveState();
   toast(`Created "${name}" with ${playerIds.length} players · Beer balances carried over 🍺`, 'good');
