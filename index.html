@@ -541,8 +541,6 @@ tr.t-ir .stk     { background:#FFCDD2 !important; }
 .att.cut { background:var(--cut-bg) !important;color:var(--cut-text) !important; }
 .att.att-locked { opacity:0.6;cursor:default !important; }
 .game-past-locked { opacity:0.85; }
-.game-history-only { opacity:0.7; background:var(--paper-2) !important; }
-.beer-cell.history-only input { opacity:0.7; }
 .game-lock-btn { font-size:11px;margin-top:3px;cursor:pointer;opacity:0.7;line-height:1; }
 .game-lock-btn:hover { opacity:1; }
 .fee-summary-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--paper-2);border-radius:8px;font-size:13px;margin-top:10px;flex-wrap:wrap;}
@@ -2185,13 +2183,11 @@ function renderBeerMatrix(s, players, games) {
   games.forEach((g, idx) => {
     const isPast = g.date && g.date < today;
     const isUnlocked = unlockedPastGames.has(g.id);
-    const isHistoryOnly = !isFinancialGame(g.id);
     const lockBtn = isPast && isAdmin ? `<div class="game-lock-btn" onclick="event.stopPropagation();toggleGameLock('${g.id}')" title="${isUnlocked ? 'Lock' : 'Unlock to edit'}">${isUnlocked ? '🔓' : '🔒'}</div>` : '';
-    head += `<th class="game-col${isPast && !isUnlocked ? ' game-past-locked' : ''}${isHistoryOnly ? ' game-history-only' : ''}" title="${esc(g.opponent || 'TBD')}${isHistoryOnly ? ' (history only — not counted in balance)' : ''}">
+    head += `<th class="game-col${isPast && !isUnlocked ? ' game-past-locked' : ''}" title="${esc(g.opponent || 'TBD')}">
       <div class="gnum">GAME ${g.number || idx + 1}</div>
       <div class="gdate">${fmtDayShort(g.date)} ${fmtDateTiny(g.date)}</div>
       <div class="gopp">${esc(g.opponent || 'TBD')}</div>
-      ${isHistoryOnly ? '<div style="font-size:9px;opacity:0.6;margin-top:2px;">HISTORY</div>' : ''}
       ${lockBtn}
     </th>`;
   });
@@ -2228,16 +2224,15 @@ function renderBeerMatrix(s, players, games) {
     games.forEach(g => {
       const isPast = g.date && g.date < today;
       const isUnlocked = unlockedPastGames.has(g.id);
-      const isHistoryOnly = !isFinancialGame(g.id);
       const editable = isAdmin && (!isPast || isUnlocked);
       const beers = parseInt((state.beers[g.id] || {})[p.id]) || 0;
       const att = (state.attendance[g.id] || {})[p.id];
       const wasIn = att === 'in';
       const bucket = beers >= 5 ? 'b-5' : 'b-' + beers;
       const emptyCellBg = !wasIn ? `style="background:${rowTint}"` : '';
-      const cls = `beer-cell${wasIn ? ' ' + bucket : ' not-in'}${isPast && !isUnlocked ? ' att-locked' : ''}${isHistoryOnly ? ' history-only' : ''}`;
+      const cls = `beer-cell${wasIn ? ' ' + bucket : ' not-in'}${isPast && !isUnlocked ? ' att-locked' : ''}`;
       const display = wasIn ? (beers || '') : '';
-      body += `<td class="${cls}" ${emptyCellBg}><input type="number" min="0" max="99" value="${display}" ${wasIn && editable ? `onchange="updateBeer('${g.id}','${p.id}',this.value)"` : 'readonly disabled'} title="${wasIn ? esc(p.name) + ' — Game ' + (g.number || '') : 'Not IN'}${isPast && !isUnlocked ? ' (locked)' : ''}${isHistoryOnly ? ' (history only)' : ''}"></td>`;
+      body += `<td class="${cls}" ${emptyCellBg}><input type="number" min="0" max="99" value="${display}" ${wasIn && editable ? `onchange="updateBeer('${g.id}','${p.id}',this.value)"` : 'readonly disabled'} title="${wasIn ? esc(p.name) + ' — Game ' + (g.number || '') : 'Not IN'}${isPast && !isUnlocked ? ' (locked)' : ''}"></td>`;
     });
     body += `<td class="games-played ${beerCount === 0 ? 'zero' : ''}">${avg.toFixed(1)}</td></tr>`;
   });
