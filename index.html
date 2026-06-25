@@ -519,6 +519,13 @@ body.is-admin .matrix .carry-cell input:focus{border-color:var(--rust);backgroun
 .stk-6 { left:320px !important; }
 .stk-7 { left:400px !important; }
 
+/* ── beer matrix has its own column layout: Pos, Name, Paid, Beers, Balance ── */
+.beer-matrix-wrap .stk-2 { left:0 !important; width:38px !important; min-width:38px !important; }
+.beer-matrix-wrap .stk-3 { left:38px !important; width:150px !important; min-width:150px !important; }
+.beer-matrix-wrap .stk-4 { left:188px !important; width:60px !important; min-width:60px !important; }
+.beer-matrix-wrap .stk-5b { left:248px !important; width:55px !important; min-width:55px !important; }
+.beer-matrix-wrap .stk-6 { left:303px !important; width:80px !important; min-width:80px !important; border-right:2px solid var(--ink) !important; }
+
 /* ── row tint backgrounds must also apply to sticky cells ── */
 tr.t-full .stk   { background:#FFFAE8 !important; }
 tr.t-part .stk   { background:#EAF4FB !important; }
@@ -634,21 +641,24 @@ tr.t-ir .stk     { background:#FFCDD2 !important; }
   /* J# cell compact */
   .matrix .stk-4{font-size:11px;padding:4px 3px}
 
-  /* Beer matrix: show Balance (stk-6) instead of Paid (stk-4) on mobile */
+  /* Beer matrix on mobile: Pos, Name, Paid, Balance (hide raw Beers count) */
   .beer-matrix-wrap .stk-5b{display:none !important}
+  .beer-matrix-wrap .stk-2{left:0 !important;width:34px !important;min-width:34px !important;}
+  .beer-matrix-wrap .stk-3{left:34px !important;width:94px !important;min-width:94px !important;}
   .beer-matrix-wrap .stk-4{
     display:table-cell !important;
     left:128px !important;
-    width:58px !important;
-    min-width:58px !important;
+    width:52px !important;
+    min-width:52px !important;
     font-size:11px;
   }
   .beer-matrix-wrap .stk-6{
     display:table-cell !important;
-    left:186px !important;
-    width:65px !important;
-    min-width:65px !important;
+    left:180px !important;
+    width:62px !important;
+    min-width:62px !important;
     font-size:11px;
+    border-right:2px solid var(--ink) !important;
   }
 }
 
