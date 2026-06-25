@@ -2092,7 +2092,9 @@ function renderBeerBank() {
   const beerValue = totalBeersConsumed * (state.pricePerBeer || 0);
   const totalCarry = players.reduce((sum,p) => sum + (parseFloat(p.startingBeerBalance)||0), 0);
   const totalBeerPaid = players.reduce((sum,p) => sum + playerPaymentsSum(p.id,null,'beer'), 0);
-  const fundTotal = totalCarry + totalBeerPaid - beerValue;
+  // Fund total uses ONLY financial games (G8+) so history games don't double-count
+  const financialBeerValue = players.reduce((sum,p) => sum + financialBeersForPlayer(p.id), 0) * (state.pricePerBeer || 0);
+  const fundTotal = totalCarry + totalBeerPaid - financialBeerValue;
   const bpg = teamBPG(s.id);
 
   const typeOrder = { full:1, part:2, sub:3, spare:4, goalie:5, ir:6 };
