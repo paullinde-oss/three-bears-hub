@@ -3301,7 +3301,29 @@ async function clearLineup(gameId) {
 const SN_TEAM_ID = '7k4lXyCnOQqD2h47';
 const SN_SCHEDULE_ID = 'RKUIllHs4Gcvvf5v';
 const SN_CALENDAR_URL = 'https://canlan2-api.sportninja.net/v1/calendar/7k4lXyCnOQqD2h47/games';
-const SN_GAMES_URL = `https://canlan2-api.sportninja.net/v1/schedules/${SN_SCHEDULE_ID}/games?page=1&order=asc&exclude_cancelled_games=1&team_id=${SN_TEAM_ID}&starts_after=${new Date().toISOString().slice(0,10)}T00:00:00-07:00&starts_before=${new Date().getFullYear()+1}-12-31T00:00:00-07:00`;
+function buildSNGamesUrl() {
+  // Start window the day AFTER the latest manually-entered Firebase game,
+  // so all SportNinja games (including already-played ones) stay visible
+  // without duplicating the manual G1-G7 history.
+  const s = activeSeason();
+  const fbGames = s ? seasonGames(s.id) : [];
+  let startsAfter;
+  if (fbGames.length > 0) {
+    const latest = fbGames.reduce((max, g) => (g.date && g.date > max) ? g.date : max, '');
+    if (latest) {
+      const [y, m, d] = latest.split('-').map(Number);
+      const next = new Date(y, m - 1, d + 1);
+      startsAfter = `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`;
+    }
+  }
+  // Fallback: look back 6 months if no Firebase games (e.g. future all-SportNinja seasons)
+  if (!startsAfter) {
+    const back = new Date();
+    back.setMonth(back.getMonth() - 6);
+    startsAfter = back.toISOString().slice(0, 10);
+  }
+  return `https://canlan2-api.sportninja.net/v1/schedules/${SN_SCHEDULE_ID}/games?page=1&order=asc&exclude_cancelled_games=1&team_id=${SN_TEAM_ID}&starts_after=${startsAfter}T00:00:00-07:00&starts_before=${new Date().getFullYear()+1}-12-31T00:00:00-07:00`;
+}
 
 let snGamesCache = null;
 let snGamesLastFetch = 0;
@@ -3310,7 +3332,7 @@ async function fetchSNGames() {
   const now = Date.now();
   if (snGamesCache && now - snGamesLastFetch < 5 * 60 * 1000) return snGamesCache;
   try {
-    const res = await fetch(SN_GAMES_URL);
+    const res = await fetch(buildSNGamesUrl());
     if (!res.ok) throw new Error('API error');
     const json = await res.json();
     snGamesCache = (json.data || []).map((g, idx) => {
