@@ -3017,8 +3017,10 @@ function renderLineupBuilder(s, games, players) {
       <div class="lineup-empty">Add a game first, then build your lineup here.</div></div>`;
   }
   const today = isoToday();
-  // Default to next upcoming game
-  if (!lineupGameId || !findGame(lineupGameId)) {
+  // Default to next upcoming game — recalculate if current selection is a past game or missing
+  const currentGame = lineupGameId ? findGame(lineupGameId) : null;
+  const currentIsPast = currentGame && currentGame.date < today;
+  if (!lineupGameId || !currentGame || currentIsPast) {
     const upcoming = games.find(g => g.date >= today);
     lineupGameId = (upcoming || games[games.length - 1]).id;
   }
