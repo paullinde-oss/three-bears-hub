@@ -519,12 +519,12 @@ body.is-admin .matrix .carry-cell input:focus{border-color:var(--rust);backgroun
 .stk-6 { left:320px !important; }
 .stk-7 { left:400px !important; }
 
-/* ── beer matrix has its own column layout: Pos, Name, Paid, Beers, Balance ── */
+/* ── beer matrix has its own column layout: Pos, Name, Beers, Balance ── */
 .beer-matrix-wrap .stk-2 { left:0 !important; width:38px !important; min-width:38px !important; }
 .beer-matrix-wrap .stk-3 { left:38px !important; width:150px !important; min-width:150px !important; }
 .beer-matrix-wrap .stk-4 { left:188px !important; width:60px !important; min-width:60px !important; }
-.beer-matrix-wrap .stk-5b { left:248px !important; width:55px !important; min-width:55px !important; }
-.beer-matrix-wrap .stk-6 { left:303px !important; width:80px !important; min-width:80px !important; border-right:2px solid var(--ink) !important; }
+.beer-matrix-wrap .stk-5b { display:none !important; }
+.beer-matrix-wrap .stk-6 { left:248px !important; width:80px !important; min-width:80px !important; border-right:2px solid var(--ink) !important; }
 
 /* ── row tint backgrounds must also apply to sticky cells ── */
 tr.t-full .stk   { background:#FFFAE8 !important; }
@@ -639,22 +639,22 @@ tr.t-ir .stk     { background:#FFCDD2 !important; }
   /* J# cell compact */
   .matrix .stk-4{font-size:11px;padding:4px 3px}
 
-  /* Beer matrix on mobile: Pos, Name, Paid, Balance (hide raw Beers count) */
+  /* Beer matrix on mobile: Pos, Name, Beers, Balance */
   .beer-matrix-wrap .stk-5b{display:none !important}
   .beer-matrix-wrap .stk-2{left:0 !important;width:34px !important;min-width:34px !important;}
-  .beer-matrix-wrap .stk-3{left:34px !important;width:94px !important;min-width:94px !important;}
+  .beer-matrix-wrap .stk-3{left:34px !important;width:104px !important;min-width:104px !important;}
   .beer-matrix-wrap .stk-4{
     display:table-cell !important;
-    left:128px !important;
-    width:52px !important;
-    min-width:52px !important;
+    left:138px !important;
+    width:45px !important;
+    min-width:45px !important;
     font-size:11px;
   }
   .beer-matrix-wrap .stk-6{
     display:table-cell !important;
-    left:180px !important;
-    width:62px !important;
-    min-width:62px !important;
+    left:183px !important;
+    width:65px !important;
+    min-width:65px !important;
     font-size:11px;
     border-right:2px solid var(--ink) !important;
   }
@@ -1439,10 +1439,10 @@ function beersForGame(gId) {
   return Object.values(b).reduce((s, n) => s + (parseInt(n) || 0), 0);
 }
 function isFinancialGame(gId) {
-  // Firebase games (G1-7) are history-only — not counted in balance
-  // SportNinja games (G8+) count financially
-  const inFirebase = state.games.some(g => g.id === gId);
-  return !inFirebase; // only non-Firebase (SportNinja) games count financially
+  // Firebase games (G1-7, manually entered) are history-only — not counted in balance
+  // SportNinja games (G8+) count financially — even if they have a score saved in Firebase
+  const inFirebase = state.games.some(g => g.id === gId && !g.isSNGame);
+  return !inFirebase;
 }
 
 function totalBeersForPlayer(pId) {
@@ -2212,7 +2212,7 @@ function renderBeerMatrix(s, players, games) {
   const today = isoToday();
   let head = `<tr>
     <th class="stk stk-2">Pos</th><th class="stk stk-3">Name</th>
-    <th class="stk stk-4">Paid</th><th class="stk stk-5b">Beers</th>
+    <th class="stk stk-4">Beers</th><th class="stk stk-5b" style="display:none"></th>
     <th class="stk stk-6">Balance</th>`;
   games.forEach((g, idx) => {
     const isPast = g.date && g.date < today;
@@ -2234,7 +2234,7 @@ function renderBeerMatrix(s, players, games) {
       const info = TYPE_INFO[p.type] || TYPE_INFO.full;
       body += `<tr class="section-divider">
         <td class="stk stk-2" style="padding-left:8px" colspan="2">${info.label}</td>
-        <td class="stk stk-4"></td><td class="stk stk-5b"></td><td class="stk stk-6"></td>
+        <td class="stk stk-4"></td><td class="stk stk-6"></td>
         ${games.map(() => `<td></td>`).join('')}<td></td>
       </tr>`;
       lastType = p.type;
@@ -2252,8 +2252,7 @@ function renderBeerMatrix(s, players, games) {
     body += `<tr class="t-${p.type}" data-pid="${p.id}" style="background:${rowTint}">
       <td class="stk stk-2">${esc(p.position || '')}</td>
       <td class="stk stk-3" onclick="openProfile('${p.id}')" style="cursor:pointer"><span class="matrix-name-cell" style="display:inline-flex;align-items:center;gap:5px">${renderAvatar(p, 'sm')}<span>${esc(p.name)}</span></span></td>
-      <td class="stk stk-4" ${isAdmin ? `onclick="openPaymentModal('${p.id}','beer')" style="cursor:pointer;"` : ''}>${fmtCompact(beerPaid)}</td>
-      <td class="stk stk-5b">${beerCount}</td>
+      <td class="stk stk-4">${beerCount}</td>
       <td class="stk stk-6 ${balCls}">${fmtSigned(balance)}</td>`;
     games.forEach(g => {
       const isPast = g.date && g.date < today;
