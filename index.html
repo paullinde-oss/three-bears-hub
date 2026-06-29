@@ -1398,15 +1398,20 @@ function mergedGames(sId) {
   const fb = seasonGames(sId);
   const sn = snGamesCache || [];
   const snIds = new Set(sn.map(g => g.id));
-  return [...fb.filter(g => !snIds.has(g.id)), ...sn]
+  // SN games merged with any Firebase score/detail overrides
+  const fbById = {};
+  state.games.forEach(g => { fbById[g.id] = g; });
+  const snMerged = sn.map(g => fbById[g.id] ? { ...g, ...fbById[g.id] } : g);
+  return [...fb.filter(g => !snIds.has(g.id)), ...snMerged]
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 }
 // Find a game by ID across both Firebase and SportNinja cache
 function findGame(gameId) {
   if (!gameId) return null;
-  return (snGamesCache || []).find(g => g.id === gameId)
-    || state.games.find(g => g.id === gameId)
-    || null;
+  const snGame = (snGamesCache || []).find(g => g.id === gameId);
+  const fbGame = state.games.find(g => g.id === gameId);
+  if (snGame && fbGame) return { ...snGame, ...fbGame }; // merge: FB score/details override SN
+  return snGame || fbGame || null;
 }
 function playerPaymentsSum(pId, sId, fund) {
   return state.payments.filter(p =>
@@ -2709,7 +2714,17 @@ function openGameForm(gameId) {
         ourScore: f.get('ourScore') === '' ? null : f.get('ourScore'),
         theirScore: f.get('theirScore') === '' ? null : f.get('theirScore'),
         notes: f.get('notes').trim() };
-      if (isEdit) { Object.assign(g, data); toast('Game updated', 'good'); }
+      if (isEdit) {
+        // Check if this is a SportNinja game (not in state.games)
+        const fbGame = state.games.find(x => x.id === gameId);
+        if (fbGame) {
+          Object.assign(fbGame, data);
+        } else {
+          // SportNinja game — save score/details to Firebase so they persist after refresh
+          state.games.push({ id: gameId, seasonId: s.id, isSNGame: true, ...data });
+        }
+        toast('Game updated', 'good');
+      }
       else { state.games.push({ id: uid(), seasonId: s.id, ...data }); toast('Game added', 'good'); }
       await saveState(); closeModal(); render();
     });
