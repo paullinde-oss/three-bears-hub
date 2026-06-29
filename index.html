@@ -1420,7 +1420,14 @@ function gamesPlayedFor(pId, sId) {
 }
 function bodiesForGame(gId, sId) {
   const att = state.attendance[gId] || {};
-  return seasonPlayers(sId).filter(p => att[p.id] === 'in' && p.type !== 'ir' && p.type !== 'goalie' && p.position?.toLowerCase() !== 'g').length;
+  const players = seasonPlayers(sId);
+  // Count IN and CUT players (both showed up) except goalies and IR
+  return Object.keys(att).filter(pid => {
+    if (att[pid] !== 'in' && att[pid] !== 'cut') return false;
+    const p = players.find(x => x.id === pid);
+    if (!p) return false;
+    return p.type !== 'ir' && p.type !== 'goalie' && p.position?.toLowerCase() !== 'g';
+  }).length;
 }
 function beersForGame(gId) {
   const b = state.beers[gId] || {};
@@ -1706,9 +1713,12 @@ function openShareLineup(gameId) {
   });
 
   // Team stats
-  const scored = games.filter(g=>!isNaN(parseInt(g.ourScore))&&!isNaN(parseInt(g.theirScore)));
-  const wins = scored.filter(g=>parseInt(g.ourScore)>parseInt(g.theirScore)).length;
-  const losses = scored.filter(g=>parseInt(g.ourScore)<parseInt(g.theirScore)).length;
+  const scored = games.filter(g => {
+    const fbG = state.games.find(x => x.id === g.id);
+    return !isNaN(parseInt(fbG?.ourScore ?? g.ourScore)) && !isNaN(parseInt(fbG?.theirScore ?? g.theirScore));
+  });
+  const wins = scored.filter(g => { const fb = state.games.find(x=>x.id===g.id); return parseInt(fb?.ourScore??g.ourScore) > parseInt(fb?.theirScore??g.theirScore); }).length;
+  const losses = scored.filter(g => { const fb = state.games.find(x=>x.id===g.id); return parseInt(fb?.ourScore??g.ourScore) < parseInt(fb?.theirScore??g.theirScore); }).length;
   const totalBeers = players.reduce((s,p)=>s+beerTotals[p.id],0);
   const teamBpg = scored.length>0 ? (totalBeers/scored.length).toFixed(1) : '0.0';
 
@@ -1878,7 +1888,8 @@ function renderMatrix(s, players, games) {
     <th class="stk stk-4">J#</th><th class="stk stk-5 mob-hide">Paid</th>
     <th class="stk stk-6">Balance</th>`;
   games.forEach((g, idx) => {
-    const us = parseInt(g.ourScore), them = parseInt(g.theirScore);
+    const fbG = state.games.find(x => x.id === g.id);
+    const us = parseInt(fbG?.ourScore ?? g.ourScore), them = parseInt(fbG?.theirScore ?? g.theirScore);
     const hasScore2 = !isNaN(us) && !isNaN(them);
     const resultLabel = hasScore2 ? (us > them ? `<div class="gresult good">W ${us}-${them}</div>` : us < them ? `<div class="gresult bad">L ${us}-${them}</div>` : `<div class="gresult warn">T ${us}-${them}</div>`) : '';
     const isPast = g.date && g.date < today;
@@ -1963,9 +1974,25 @@ async function cycleAttend(gameId, playerId, el, rowTint) {
   if (el) {
     el.className = (next ? 'att ' + next : 'att') + (el.className.includes('att-locked') ? ' att-locked' : '');
     el.textContent = next === 'in' ? '✓' : next === 'out' ? '✗' : next === 'cut' ? '✓' : '';
-    // Restore row tint on empty, clear inline style when status is set (CSS takes over)
     if (!next && rowTint) el.style.background = rowTint;
     else el.style.background = '';
+    // Update bodies count row in real-time
+    const s = activeSeason();
+    if (s) {
+      const colIdx = [...(el.closest('tr')?.parentElement?.querySelector('tr')?.cells || [])].findIndex((c,i) => {
+        const rows = el.closest('tbody')?.rows;
+        return el.closest('tr') && el.cellIndex === el.cellIndex;
+      });
+      // Find bodies row and update the matching column
+      const bodiesRow = el.closest('table')?.querySelector('tr.bodies-row');
+      if (bodiesRow) {
+        const gameColIdx = el.cellIndex;
+        const bodiesCell = bodiesRow.cells[gameColIdx];
+        if (bodiesCell) {
+          bodiesCell.textContent = bodiesForGame(gameId, s.id) || '';
+        }
+      }
+    }
   }
   await saveState();
 }
@@ -3431,7 +3458,10 @@ async function renderSchedule() {
   const rows = games.length === 0
     ? `<div class="matrix-empty">No games scheduled.</div>`
     : games.map(g => {
-        const us = parseInt(g.ourScore), them = parseInt(g.theirScore);
+        // For SportNinja games, scores are stored in Firebase state.games
+        const fbGame = state.games.find(x => x.id === g.id);
+        const us = parseInt(fbGame?.ourScore ?? g.ourScore);
+        const them = parseInt(fbGame?.theirScore ?? g.theirScore);
         const hasScore = !isNaN(us) && !isNaN(them);
         let resTxt = '—', resCls = '';
         if (hasScore) { resTxt = us + '-' + them; resCls = us > them ? 'good' : us < them ? 'bad' : 'warn'; }
