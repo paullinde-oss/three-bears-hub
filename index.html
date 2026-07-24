@@ -1499,7 +1499,9 @@ function fmtAmPm(t) {
   const h12 = h % 12 || 12;
   return `${h12}:${String(m||0).padStart(2,'0')} ${ampm}`;
 }
-function isoToday() { return new Date().toISOString().slice(0, 10); }
+function isoToday() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' });
+}
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function toast(msg, type) {
   const t = document.getElementById('toast');
@@ -3058,10 +3060,9 @@ function renderLineupBuilder(s, games, players) {
       <div class="lineup-empty">Add a game first, then build your lineup here.</div></div>`;
   }
   const today = isoToday();
-  // Default to next upcoming game — recalculate if current selection is a past game or missing
-  const currentGame = lineupGameId ? findGame(lineupGameId) : null;
-  const currentIsPast = currentGame && currentGame.date < today;
-  if (!lineupGameId || !currentGame || currentIsPast) {
+  // Default to next upcoming game on first load only
+  // If user has manually selected a past game, keep it (view-only mode)
+  if (!lineupGameId || !currentGame) {
     const upcoming = games.find(g => g.date >= today);
     lineupGameId = (upcoming || games[games.length - 1]).id;
   }
