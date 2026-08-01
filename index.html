@@ -1234,7 +1234,8 @@ let state = {
 let isAdmin = false;
 let activeTab = 'dashboard';
 let lineupGameId = null;
-const unlockedPastGames = new Set(); // games admin has unlocked for editing
+const unlockedPastGames = new Set(); // games admin has unlocked for attendance editing
+const unlockedLineupGames = new Set(); // games admin has unlocked for lineup editing
 function setLineupGame(id) { lineupGameId = id; render(); }
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -1523,6 +1524,15 @@ document.getElementById('modalBg').addEventListener('click', e => { if (e.target
 
 // Calendar handled by openAddToCalendar() using SportNinja live feed
 
+function toggleLineupLock(gameId) {
+  if (unlockedLineupGames.has(gameId)) {
+    unlockedLineupGames.delete(gameId);
+  } else {
+    unlockedLineupGames.add(gameId);
+  }
+  render();
+}
+
 function toggleGameLock(gameId) {
   if (unlockedPastGames.has(gameId)) {
     unlockedPastGames.delete(gameId);
@@ -1678,17 +1688,24 @@ function render() {
   if (activeTab === 'dashboard') {
     c.innerHTML = renderDashboard();
     setTimeout(scrollToRecentGame, 50);
-    // If no cache yet, fetch from SportNinja then re-render dashboard with live games
-    if (!snGamesCache) {
-      fetchSNGames().then(games => {
-        if (games && activeTab === 'dashboard') {
-          c.innerHTML = renderDashboard();
-          setTimeout(scrollToRecentGame, 50);
-        }
-      });
-    }
+    // Always fetch/refresh SN games and re-render to ensure fresh data
+    fetchSNGames().then(games => {
+      if (games && activeTab === 'dashboard') {
+        c.innerHTML = renderDashboard();
+        setTimeout(scrollToRecentGame, 50);
+      }
+    });
   }
-  else if (activeTab === 'beer') { c.innerHTML = renderBeerBank(); setTimeout(scrollToRecentGame, 50); }
+  else if (activeTab === 'beer') {
+    c.innerHTML = renderBeerBank();
+    setTimeout(scrollToRecentGame, 50);
+    fetchSNGames().then(games => {
+      if (games && activeTab === 'beer') {
+        c.innerHTML = renderBeerBank();
+        setTimeout(scrollToRecentGame, 50);
+      }
+    });
+  }
   else if (activeTab === 'schedule') { renderSchedule().then(html => { if (activeTab === 'schedule') c.innerHTML = html; }); c.innerHTML = '<div class="matrix-empty" style="padding:32px;text-align:center;"><span style="opacity:0.5;font-size:13px;">Loading schedule from SportNinja…</span></div>'; }
   else if (activeTab === 'settings') c.innerHTML = renderSettings();
 }
@@ -3069,6 +3086,8 @@ function renderLineupBuilder(s, games, players) {
   const game = findGame(lineupGameId);
   if (!game) return '';
   const isPastGame = game.date && game.date < today;
+  const isLineupUnlocked = unlockedLineupGames.has(game.id);
+  const viewOnly = isPastGame && !isLineupUnlocked;
   ensureLineup(game.id);
   const lu = state.lineups[game.id];
   const att = state.attendance[game.id] || {};
@@ -3095,9 +3114,9 @@ function renderLineupBuilder(s, games, players) {
     <div class="lu-line">
       <div class="lu-line-lbl">LINE ${num}</div>
       <div class="lu-cards-row">
-        ${renderLuCard(slotPlayer(lu[key].L,players),'LW',game.id,key,'L',att,isPastGame)}
-        ${renderLuCard(slotPlayer(lu[key].C,players),'C',game.id,key,'C',att,isPastGame)}
-        ${renderLuCard(slotPlayer(lu[key].R,players),'RW',game.id,key,'R',att,isPastGame)}
+        ${renderLuCard(slotPlayer(lu[key].L,players),'LW',game.id,key,'L',att,viewOnly)}
+        ${renderLuCard(slotPlayer(lu[key].C,players),'C',game.id,key,'C',att,viewOnly)}
+        ${renderLuCard(slotPlayer(lu[key].R,players),'RW',game.id,key,'R',att,viewOnly)}
       </div>
     </div>`;
 
@@ -3105,8 +3124,8 @@ function renderLineupBuilder(s, games, players) {
     <div class="lu-line">
       <div class="lu-line-lbl">PAIR ${num}</div>
       <div class="lu-cards-row d-row">
-        ${renderLuCard(slotPlayer(lu[key].L,players),'LD',game.id,key,'L',att,isPastGame)}
-        ${renderLuCard(slotPlayer(lu[key].R,players),'RD',game.id,key,'R',att,isPastGame)}
+        ${renderLuCard(slotPlayer(lu[key].L,players),'LD',game.id,key,'L',att,viewOnly)}
+        ${renderLuCard(slotPlayer(lu[key].R,players),'RD',game.id,key,'R',att,viewOnly)}
       </div>
     </div>`;
 
@@ -3117,7 +3136,9 @@ function renderLineupBuilder(s, games, players) {
         <select id="lineupGameSelect" onchange="setLineupGame(this.value)" style="width:100%;max-width:100%;min-width:100%;order:10;flex-basis:100%;">${gameOpts}</select>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;width:100%;order:20;">
           ${isPastGame
-            ? `<span style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;letter-spacing:0.05em;">🔒 PAST GAME — VIEW ONLY</span>`
+            ? isAdmin
+              ? `<button class="btn btn-ghost btn-sm" onclick="toggleLineupLock('${game.id}')" style="display:inline-flex;align-items:center;gap:5px;">${isLineupUnlocked ? '🔓 Lock Lineup' : '🔒 Unlock to Edit'}</button>`
+              : `<span style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;letter-spacing:0.05em;">🔒 PAST GAME — VIEW ONLY</span>`
             : isAdmin ? `<button class="btn btn-rust btn-sm" onclick="autoBuildLineup(getLineupGameId('${game.id}'))" title="Auto-fill lineup from attendance + position history">⚡ Auto Build</button>
           <button class="btn ${swapMode ? 'btn-rust' : 'btn-ghost'} btn-sm" onclick="toggleSwapMode()" title="Tap two slots to swap players">↔ ${swapMode ? (swapSlot1 ? 'Tap 2nd slot…' : 'Tap a slot') : 'Swap'}</button>
           <button class="btn btn-ghost btn-sm" onclick="openShareLineup(getLineupGameId('${game.id}'))">📤 Share</button>` : ''
@@ -3150,13 +3171,13 @@ function renderLineupBuilder(s, games, players) {
       <div class="lu-section">
         <div class="lu-section-hdr">GOALIE</div>
         <div class="lu-cards-row goalie-row">
-          ${renderLuGoalieCard(slotPlayer(lu.g,players), game.id, att, isPastGame)}
+          ${renderLuGoalieCard(slotPlayer(lu.g,players), game.id, att, viewOnly)}
         </div>
       </div>
 
       <div class="lineup-summary">
         <span><strong>${totalSlots}</strong> in lineup</span>
-        ${isAdmin && !isPastGame ? `<span style="margin-left:auto;"><button class="btn btn-ghost btn-sm" onclick="clearLineup(getLineupGameId('${game.id}'))">Clear All</button></span>` : ''}
+        ${isAdmin && !viewOnly ? `<span style="margin-left:auto;"><button class="btn btn-ghost btn-sm" onclick="clearLineup(getLineupGameId('${game.id}'))">Clear All</button></span>` : ''}
       </div>
     </div>
   `;
