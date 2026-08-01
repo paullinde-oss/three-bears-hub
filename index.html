@@ -1919,12 +1919,14 @@ function renderMatrix(s, players, games) {
     const isPast = g.date && g.date < today;
     const isUnlocked = unlockedPastGames.has(g.id);
     const lockBtn = isPast && isAdmin ? `<div class="game-lock-btn" onclick="event.stopPropagation();toggleGameLock('${g.id}')" title="${isUnlocked ? 'Lock this game' : 'Unlock to edit attendance'}">${isUnlocked ? '🔓' : '🔒'}</div>` : '';
-    head += `<th class="game-col${isPast && !isUnlocked ? ' game-past-locked' : ''}" title="${esc(g.opponent || 'TBD')} — ${fmtDateShort(g.date)}" ${isAdmin ? `onclick="openGameForm('${g.id}')" style="cursor:pointer;"` : ''}>
-      <div class="gnum">GAME ${g.number || idx + 1}</div>
-      <div class="gdate">${fmtDayShort(g.date)} ${fmtDateTiny(g.date)}</div>
-      <div class="gopp">${esc(g.opponent || 'TBD')}</div>
-      ${g.time ? `<div class="gtime">${fmtAmPm(g.time)}</div>` : ''}
-      ${resultLabel}
+    head += `<th class="game-col${isPast && !isUnlocked ? ' game-past-locked' : ''}" title="${esc(g.opponent || 'TBD')} — ${fmtDateShort(g.date)}">
+      <div style="cursor:${isAdmin?'pointer':'default'}" onclick="${isAdmin?`openGameForm('${g.id}')`:''}" >
+        <div class="gnum">GAME ${g.number || idx + 1}</div>
+        <div class="gdate">${fmtDayShort(g.date)} ${fmtDateTiny(g.date)}</div>
+        <div class="gopp">${esc(g.opponent || 'TBD')}</div>
+        ${g.time ? `<div class="gtime">${fmtAmPm(g.time)}</div>` : ''}
+        ${resultLabel}
+      </div>
       ${lockBtn}
     </th>`;
   });
