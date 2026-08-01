@@ -1242,6 +1242,46 @@ function toggleEditPastGames() {
   editPastGamesMode = !editPastGamesMode;
   render();
 }
+
+function openGameLockPanel() {
+  const existing = document.getElementById('gameLockPanel');
+  if (existing) { existing.remove(); return; }
+  const s = activeSeason();
+  if (!s) return;
+  const today = isoToday();
+  const games = mergedGames(s.id);
+  const pastGames = games.filter(g => g.date && g.date < today);
+  if (!pastGames.length) { toast('No past games to lock/unlock', 'good'); return; }
+
+  const panel = document.createElement('div');
+  panel.id = 'gameLockPanel';
+  panel.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  panel.innerHTML = `
+    <div style="background:var(--paper);border-radius:14px;width:100%;max-width:380px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+      <div style="padding:18px 18px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;">
+        <h3 style="margin:0;font-family:'Fraunces',serif;font-size:18px;">🔒 Lock / Unlock Games</h3>
+        <button onclick="document.getElementById('gameLockPanel').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+      </div>
+      <div style="overflow-y:auto;padding:12px 18px;flex:1;">
+        <p style="margin:0 0 12px;font-size:13px;color:var(--muted);">Unlock a past game to edit attendance. Locks again automatically when you close this panel.</p>
+        ${pastGames.map(g => {
+          const isUnlocked = unlockedPastGames.has(g.id);
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);">
+            <span style="font-size:13px;">G${g.number} · ${fmtDateShort(g.date)} vs ${esc(g.opponent||'TBD')}</span>
+            <button onclick="toggleGameLock('${g.id}');this.closest('div').querySelector('span').style.opacity=unlockedPastGames.has('${g.id}')?'1':'0.6';this.textContent=unlockedPastGames.has('${g.id}')?'🔓 Unlocked':'🔒 Locked';this.style.background=unlockedPastGames.has('${g.id}')?'var(--rust)':'var(--paper-3)';this.style.color=unlockedPastGames.has('${g.id}')?'white':'var(--ink)';"
+              style="padding:6px 12px;border-radius:6px;border:1px solid var(--line);cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;background:${isUnlocked?'var(--rust)':'var(--paper-3)'};color:${isUnlocked?'white':'var(--ink)'};">
+              ${isUnlocked?'🔓 Unlocked':'🔒 Locked'}
+            </button>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="padding:14px 18px;border-top:1px solid var(--line);">
+        <button onclick="document.getElementById('gameLockPanel').remove();render();" class="btn btn-rust" style="width:100%;">Done</button>
+      </div>
+    </div>`;
+  panel.addEventListener('click', e => { if (e.target === panel) { panel.remove(); render(); } });
+  document.body.appendChild(panel);
+}
 function setLineupGame(id) { lineupGameId = id; render(); }
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -1891,7 +1931,7 @@ function renderDashboard() {
       ${isAdmin ? `<button class="btn btn-rust" onclick="openAddPlayer()">+ Add Player</button>
       ${!isLive ? `<button class="btn" onclick="openAddGame()">+ Add Game</button>` : ''}` : ''}
       <div class="spacer"></div>
-      ${isAdmin && games.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="toggleEditPastGames()" style="display:inline-flex;align-items:center;gap:5px;">${editPastGamesMode ? '🔓 Editing Past' : '🔒 Edit Past Games'}</button>` : ''}
+      ${isAdmin && games.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="openGameLockPanel()" style="display:inline-flex;align-items:center;gap:5px;">🔒 Lock/Unlock Games</button>` : ''}
       ${isAdmin && games.length > 0 && players.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="cycleAllAttend()">Mark all blank → IN</button>` : ''}
       ${games.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="openAddToCalendar()" style="display:inline-flex;align-items:center;gap:5px;">📅 Add to Calendar</button>` : ''}
     </div>
