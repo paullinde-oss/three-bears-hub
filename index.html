@@ -1236,6 +1236,12 @@ let activeTab = 'dashboard';
 let lineupGameId = null;
 const unlockedPastGames = new Set(); // games admin has unlocked for attendance editing
 const unlockedLineupGames = new Set(); // games admin has unlocked for lineup editing
+let editPastGamesMode = false; // when true, ALL past game attendance cells are editable
+
+function toggleEditPastGames() {
+  editPastGamesMode = !editPastGamesMode;
+  render();
+}
 function setLineupGame(id) { lineupGameId = id; render(); }
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -1679,6 +1685,7 @@ function renderHeader() {
 }
 
 function render() {
+  const renderId = ++render._id;
   renderHeader();
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
   document.body.classList.remove('bg-rink','bg-parking');
@@ -1688,9 +1695,8 @@ function render() {
   if (activeTab === 'dashboard') {
     c.innerHTML = renderDashboard();
     setTimeout(scrollToRecentGame, 50);
-    // Always fetch/refresh SN games and re-render to ensure fresh data
     fetchSNGames().then(games => {
-      if (games && activeTab === 'dashboard') {
+      if (games && render._id === renderId && activeTab === 'dashboard') {
         c.innerHTML = renderDashboard();
         setTimeout(scrollToRecentGame, 50);
       }
@@ -1700,15 +1706,21 @@ function render() {
     c.innerHTML = renderBeerBank();
     setTimeout(scrollToRecentGame, 50);
     fetchSNGames().then(games => {
-      if (games && activeTab === 'beer') {
+      if (games && render._id === renderId && activeTab === 'beer') {
         c.innerHTML = renderBeerBank();
         setTimeout(scrollToRecentGame, 50);
       }
     });
   }
-  else if (activeTab === 'schedule') { renderSchedule().then(html => { if (activeTab === 'schedule') c.innerHTML = html; }); c.innerHTML = '<div class="matrix-empty" style="padding:32px;text-align:center;"><span style="opacity:0.5;font-size:13px;">Loading schedule from SportNinja…</span></div>'; }
+  else if (activeTab === 'schedule') {
+    c.innerHTML = '<div class="matrix-empty" style="padding:32px;text-align:center;"><span style="opacity:0.5;font-size:13px;">Loading schedule from SportNinja…</span></div>';
+    renderSchedule().then(html => {
+      if (render._id === renderId && activeTab === 'schedule') c.innerHTML = html;
+    });
+  }
   else if (activeTab === 'settings') c.innerHTML = renderSettings();
 }
+render._id = 0;
 
 function setActiveTab(t) { activeTab = t; render(); }
 
@@ -1879,6 +1891,7 @@ function renderDashboard() {
       ${isAdmin ? `<button class="btn btn-rust" onclick="openAddPlayer()">+ Add Player</button>
       ${!isLive ? `<button class="btn" onclick="openAddGame()">+ Add Game</button>` : ''}` : ''}
       <div class="spacer"></div>
+      ${isAdmin && games.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="toggleEditPastGames()" style="display:inline-flex;align-items:center;gap:5px;">${editPastGamesMode ? '🔓 Editing Past' : '🔒 Edit Past Games'}</button>` : ''}
       ${isAdmin && games.length > 0 && players.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="cycleAllAttend()">Mark all blank → IN</button>` : ''}
       ${games.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="openAddToCalendar()" style="display:inline-flex;align-items:center;gap:5px;">📅 Add to Calendar</button>` : ''}
     </div>
@@ -1917,8 +1930,7 @@ function renderMatrix(s, players, games) {
     const hasScore2 = !isNaN(us) && !isNaN(them);
     const resultLabel = hasScore2 ? (us > them ? `<div class="gresult good">W ${us}-${them}</div>` : us < them ? `<div class="gresult bad">L ${us}-${them}</div>` : `<div class="gresult warn">T ${us}-${them}</div>`) : '';
     const isPast = g.date && g.date < today;
-    const isUnlocked = unlockedPastGames.has(g.id);
-    const lockBtn = isPast && isAdmin ? `<button class="game-lock-btn" onclick="event.stopPropagation();event.preventDefault();toggleGameLock('${g.id}')" title="${isUnlocked ? 'Lock this game' : 'Unlock to edit attendance'}">${isUnlocked ? '🔓' : '🔒'}</button>` : '';
+    const isUnlocked = editPastGamesMode || unlockedPastGames.has(g.id);
     head += `<th class="game-col${isPast && !isUnlocked ? ' game-past-locked' : ''}" title="${esc(g.opponent || 'TBD')} — ${fmtDateShort(g.date)}">
       <div style="cursor:${isAdmin?'pointer':'default'}" onclick="${isAdmin?`openGameForm('${g.id}')`:''}" >
         <div class="gnum">GAME ${g.number || idx + 1}</div>
@@ -1927,7 +1939,6 @@ function renderMatrix(s, players, games) {
         ${g.time ? `<div class="gtime">${fmtAmPm(g.time)}</div>` : ''}
         ${resultLabel}
       </div>
-      ${lockBtn}
     </th>`;
   });
   head += `<th class="games-played">Played</th><th class="eligible">Playoff<br><span style="font-size:9px;opacity:0.7;">(${playoffMin}g)</span></th></tr>`;
@@ -1961,13 +1972,13 @@ function renderMatrix(s, players, games) {
       <td class="stk stk-6 ${balCls}">${balTxt}</td>`;
     games.forEach(g => {
       const isPast = g.date && g.date < today;
-      const isUnlocked = unlockedPastGames.has(g.id);
+      const isUnlocked = editPastGamesMode || unlockedPastGames.has(g.id);
       const editable = isAdmin && (!isPast || isUnlocked);
       const status = (state.attendance[g.id] && state.attendance[g.id][p.id]) || '';
       const attIcon = status==='in' ? '✓' : status==='out' ? '✗' : status==='cut' ? '✓' : '';
       const cellCls = (status ? 'att ' + status : 'att') + (isPast && !isUnlocked ? ' att-locked' : '');
       const emptyCellBg = !status ? `style="background:${rowTint}"` : '';
-      body += `<td class="${cellCls}" ${emptyCellBg} ${editable ? `onclick="cycleAttend('${g.id}','${p.id}',this,'${rowTint}')"` : ''} title="${esc(p.name)} — Game ${g.number || ''}${isPast && !isUnlocked ? ' (locked — click 🔓 to edit)' : ''}">${attIcon}</td>`;
+      body += `<td class="${cellCls}" ${emptyCellBg} ${editable ? `onclick="cycleAttend('${g.id}','${p.id}',this,'${rowTint}')"` : ''} title="${esc(p.name)} — Game ${g.number || ''}${isPast && !isUnlocked ? ' (locked)' : ''}">${attIcon}</td>`;
     });
     body += `<td class="games-played ${gp === 0 ? 'zero' : ''}">${gp}</td>
       <td class="eligible ${eligible ? 'yes' : 'no'}">${eligible ? '✓' : ''}</td></tr>`;
@@ -3081,6 +3092,7 @@ function renderLineupBuilder(s, games, players) {
   const today = isoToday();
   // Default to next upcoming game on first load only
   // If user has manually selected a past game, keep it (view-only mode)
+  const currentGame = lineupGameId ? findGame(lineupGameId) : null;
   if (!lineupGameId || !currentGame) {
     const upcoming = games.find(g => g.date >= today);
     lineupGameId = (upcoming || games[games.length - 1]).id;
@@ -4215,6 +4227,6 @@ if ('serviceWorker' in navigator) {
     });
   }
 })();
-</script>
+<div style="position:fixed;bottom:4px;right:8px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(0,0,0,0.25);pointer-events:none;z-index:1;">v3.2</div>
 </body>
 </html>
