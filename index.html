@@ -1486,10 +1486,16 @@ function beersForGame(gId) {
   return Object.values(b).reduce((s, n) => s + (parseInt(n) || 0), 0);
 }
 function isFinancialGame(gId) {
-  // Firebase games (G1-7, manually entered) are history-only — not counted in balance
-  // SportNinja games (G8+) count financially — even if they have a score saved in Firebase
-  const inFirebase = state.games.some(g => g.id === gId && !g.isSNGame);
-  return !inFirebase;
+  // G1-G7 are history-only (manually entered before beer data was wiped)
+  // G8+ count financially — whether manually entered OR from SportNinja
+  // We identify history-only games as the original 7 Firebase games (without isSNGame flag)
+  // that existed before the SportNinja integration (number <= 7)
+  const fbGame = state.games.find(g => g.id === gId);
+  if (!fbGame) return true; // SportNinja game not yet in Firebase = financial
+  if (fbGame.isSNGame) return true; // SportNinja game with saved score = financial
+  // Original Firebase game — only history-only if number <= 7
+  const gameNum = parseInt(fbGame.number) || 0;
+  return gameNum > 7;
 }
 
 function totalBeersForPlayer(pId) {
@@ -1502,7 +1508,9 @@ function financialBeersForPlayer(pId) {
   // Only count beers from G8+ (SportNinja games) towards balance
   let total = 0;
   Object.keys(state.beers).forEach(gId => {
-    if (isFinancialGame(gId)) total += parseInt((state.beers[gId] || {})[pId]) || 0;
+    const isFin = isFinancialGame(gId);
+    const beers = parseInt((state.beers[gId] || {})[pId]) || 0;
+    if (isFin) total += beers;
   });
   return total;
 }
@@ -2233,6 +2241,7 @@ function renderBeerBank() {
     <div class="action-bar">
       ${isAdmin ? `<button class="btn btn-rust" onclick="openPaymentModal(null,'beer')">+ Record Beer Payment</button>` : ''}
       <button class="btn btn-ghost" onclick="copyBeerBankSummary()">📋 Copy for WhatsApp</button>
+      ${isAdmin ? `<button class="btn btn-ghost btn-sm" onclick="toggleEditPastGames()" style="display:inline-flex;align-items:center;gap:5px;">${editPastGamesMode ? '🔓 Editing Past Games' : '🔒 Edit Past Games'}</button>` : ''}
       <div class="spacer"></div>
       <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);">Price per beer: ${fmt(state.pricePerBeer)}${isAdmin ? ' · <a href="#" onclick="event.preventDefault();setActiveTab(\'settings\')" style="color:var(--rust);">change</a>' : ''}</span>
     </div>
@@ -2328,7 +2337,7 @@ function renderBeerMatrix(s, players, games) {
       <td class="stk stk-6 ${balCls}">${fmtSigned(balance)}</td>`;
     games.forEach(g => {
       const isPast = g.date && g.date < today;
-      const isUnlocked = unlockedPastGames.has(g.id);
+      const isUnlocked = editPastGamesMode || unlockedPastGames.has(g.id);
       const editable = isAdmin && (!isPast || isUnlocked);
       const beers = parseInt((state.beers[g.id] || {})[p.id]) || 0;
       const att = (state.attendance[g.id] || {})[p.id];
@@ -2362,7 +2371,13 @@ async function updateBeer(gameId, playerId, val) {
   if (!val || n === 0 || isNaN(n)) delete state.beers[gameId][playerId];
   else state.beers[gameId][playerId] = Math.max(0, n);
   await saveState();
-  render();
+  // Re-render beer bank directly without SN fetch so it's instant
+  if (activeTab === 'beer') {
+    document.getElementById('content').innerHTML = renderBeerBank();
+    setTimeout(scrollToRecentGame, 50);
+  } else {
+    render();
+  }
 }
 
 async function updateCarry(playerId, val) {
@@ -4267,6 +4282,6 @@ if ('serviceWorker' in navigator) {
     });
   }
 })();
-<div style="position:fixed;bottom:4px;right:8px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(0,0,0,0.25);pointer-events:none;z-index:1;">v3.2</div>
+<div style="position:fixed;bottom:20px;right:12px;font-size:11px;font-family:'JetBrains Mono',monospace;color:rgba(0,0,0,0.4);pointer-events:none;z-index:100;background:rgba(255,255,255,0.6);padding:2px 6px;border-radius:4px;">v3.3</div>
 </body>
 </html>
