@@ -22,6 +22,16 @@
       "purpose": "any"
     }
   ],
-  "categories": ["sports", "utilities"],
-  "lang": "en-CA"
+  "categories": [
+    "sports",
+    "utilities"
+  ],
+  "lang": "en-CA",
+  "id": "./",
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://paullinde-oss.github.io/three-bears-hub/manifest.json"
+    }
+  ]
 }

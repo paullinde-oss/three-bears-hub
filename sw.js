@@ -1,5 +1,5 @@
-// Three Bears Hockey Hub — Service Worker v3.3
-const CACHE_NAME = 'three-bears-shell-v4';
+// Three Bears Hockey Hub — Service Worker v3.4
+const CACHE_NAME = 'three-bears-shell-v5';
 
 const SHELL_ASSETS = [
   './',
