@@ -19,6 +19,7 @@ window._installPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   window._installPrompt = e;
+  window._installPromptSeen = true;
   window.dispatchEvent(new Event('installpromptready'));
 });
 </script>
@@ -4203,6 +4204,42 @@ async function installApp() {
   showInstallHelp(alreadyInstalled);
 }
 
+// Collects what the browser reports about installability, so problems can be diagnosed remotely
+async function installDiagnostics(alreadyInstalled) {
+  const lines = [];
+  const add = (k, v) => lines.push(k + ': ' + v);
+  const ua = navigator.userAgent;
+  add('App', document.querySelector('.app-version')?.textContent || '?');
+  add('Browser', (ua.match(/(Chrome|CriOS|SamsungBrowser|Firefox|FxiOS|Version)\/[\d.]+/g) || ['?']).join(' '));
+  add('Android', (ua.match(/Android [\d.]+/) || ['no'])[0]);
+  add('In-app browser', /wv\)|FBAN|FBAV|Instagram|WhatsApp/i.test(ua) ? 'YES' : 'no');
+  add('Secure', window.isSecureContext);
+  add('Display mode', isStandalone() ? 'standalone' : 'browser');
+  add('Install prompt fired', window._installPromptSeen ? 'yes' : 'NO');
+  add('Related-apps API', navigator.getInstalledRelatedApps ? (alreadyInstalled ? 'installed' : 'not installed') : 'unsupported');
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    add('Service worker', reg ? (reg.active ? 'active' : 'registered, not active') + (navigator.serviceWorker.controller ? ', controlling' : ', not controlling') : 'NONE');
+  } catch (e) { add('Service worker', 'error ' + e.message); }
+  try {
+    const href = document.querySelector('link[rel=manifest]')?.href;
+    const r = await fetch(href, { cache: 'no-store' });
+    const m = await r.json();
+    add('Manifest', r.status + ' ' + (m.display || '?') + ' start=' + m.start_url);
+    for (const ic of m.icons || []) {
+      const ir = await fetch(new URL(ic.src, href), { cache: 'no-store' });
+      add('Icon ' + ic.sizes, ir.status);
+    }
+  } catch (e) { add('Manifest', 'ERROR ' + e.message); }
+  return lines.join('\n');
+}
+
+function copyInstallDiag() {
+  const text = document.getElementById('installDiag')?.textContent || '';
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => toast('Diagnostics copied', 'good')).catch(() => fallbackCopy(text));
+  else fallbackCopy(text);
+}
+
 function showInstallHelp(alreadyInstalled) {
   let steps;
   if (alreadyInstalled) {
@@ -4223,7 +4260,13 @@ function showInstallHelp(alreadyInstalled) {
   }
   openModal(`<h3>📲 Install Three Bears</h3>
     <div style="font-size:14px;line-height:1.7;color:var(--ink);">${steps}</div>
+    <details style="margin-top:16px;">
+      <summary style="cursor:pointer;font-size:12px;color:var(--muted);">Diagnostics (for troubleshooting)</summary>
+      <pre id="installDiag" style="font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--paper-2);padding:10px;border-radius:5px;margin-top:6px;white-space:pre-wrap;">Checking…</pre>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="copyInstallDiag()">📋 Copy diagnostics</button>
+    </details>
     <div class="modal-actions"><button type="button" class="btn btn-rust" onclick="closeModal()">Got it</button></div>`);
+  installDiagnostics(alreadyInstalled).then(t => { const el = document.getElementById('installDiag'); if (el) el.textContent = t; });
 }
 
 (function() {
@@ -4261,6 +4304,6 @@ function showInstallHelp(alreadyInstalled) {
   }
 })();
 </script>
-<div style="position:fixed;bottom:20px;right:12px;font-size:11px;font-family:'JetBrains Mono',monospace;color:rgba(0,0,0,0.4);pointer-events:none;z-index:100;background:rgba(255,255,255,0.6);padding:2px 6px;border-radius:4px;">v3.4</div>
+<div style="position:fixed;bottom:20px;right:12px;font-size:11px;font-family:'JetBrains Mono',monospace;color:rgba(0,0,0,0.4);pointer-events:none;z-index:100;background:rgba(255,255,255,0.6);padding:2px 6px;border-radius:4px;" class="app-version">v3.5</div>
 </body>
 </html>
