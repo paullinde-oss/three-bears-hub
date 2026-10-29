@@ -1,11 +1,12 @@
-// Three Bears Hockey Hub — Service Worker v3.2
-const CACHE_NAME = 'three-bears-shell-v3';
+// Three Bears Hockey Hub — Service Worker v3.3
+const CACHE_NAME = 'three-bears-shell-v4';
 
 const SHELL_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './3_Bears_logo_Pixel.png',
+  './icon-192.png',
+  './icon-512.png',
   './hockey_rink.png',
   './parking_lot.png',
   './game_card_bg.png',
