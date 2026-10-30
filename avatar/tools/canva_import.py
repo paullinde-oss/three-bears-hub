@@ -137,6 +137,19 @@ def diff_layer(base, var, region):
     return out
 
 
+def erase_mask(base, var, region):
+    x0, y0, x1, y1 = region
+    bl, vl = base[..., :3].astype(float) @ [0.299, 0.587, 0.114], var[..., :3].astype(float) @ [0.299, 0.587, 0.114]
+    vsat = var[..., :3].max(-1) - var[..., :3].min(-1)
+    m = np.zeros(bl.shape, bool)
+    m[y0:y1, x0:x1] = ((vl > 228) & (vsat < 30) & (bl < 215))[y0:y1, x0:x1]
+    m = ndi.binary_opening(m, structure=np.ones((2, 2)))
+    m = ndi.binary_dilation(m)                      # take the base's outline pixels with it
+    out = np.zeros(base.shape[:2] + (4,), np.uint8)
+    out[m] = (0, 0, 0, 255)
+    return out
+
+
 def crop_save(layer, path):
     ys, xs = np.where(layer[..., 3] > 0)
     if not len(ys):
@@ -225,13 +238,21 @@ def main():
         layer = diff_layer(base, var, REGIONS[kind])
         out_name = f'{kind}_{name}.png'
         box = crop_save(layer, os.path.join(img_dir, out_name))
+        # Where the edit turned part of the player into background (e.g. a smaller head of hair than the
+        # bald scalp), save a mask so the app can cut that bit of the base away.
+        erase = None
+        if kind in ('hair', 'hat'):
+            em = erase_mask(base, var, REGIONS[kind])
+            erase = crop_save(em, os.path.join(img_dir, f'{kind}_{name}_erase.png'))
         if not box:
             print(f'skipped {k}: no change from base found')
             continue
         part = dict(src='img/' + out_name, **box, label=label(name))
+        if erase:
+            part['erase'] = dict(src=f'img/{kind}_{name}_erase.png', **erase)
         slot = SLOT_OF[kind]
         if kind in ('hair', 'beard'):
-            part['lum'] = lum_range(layer); part['native'] = 'brown'
+            part['lum'] = lum_range(layer); part['native'] = closest_ramp(layer, HAIR)   # the colour it was drawn in
         if kind == 'hat':
             part['lum'] = lum_range(layer); part['native'] = closest_ramp(layer, GEAR)
             part['clipHairAbove'] = int(box['y'] + box['h'] * 0.75)   # hair is hidden under the crown of the hat

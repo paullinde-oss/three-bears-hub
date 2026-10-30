@@ -34,7 +34,7 @@
     const all = [];
     for (const slot of Object.values(P.slots))
       for (const part of Object.values(slot.options || {}))
-        if (part.src && !images.has(part.src)) { images.set(part.src, null); all.push(loadImg(part.src).then(im => images.set(part.src, im))); }
+        for (const p2 of [part, part.erase]) if (p2 && p2.src && !images.has(p2.src)) { images.set(p2.src, null); all.push(loadImg(p2.src).then(im => images.set(p2.src, im))); }
     await Promise.all(all);
     return P;
   }
@@ -104,8 +104,17 @@
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d');
     const hatPart = c.hat ? slot('hat').options[c.hat] : null;
+    // a hairstyle or hat may trim the base (e.g. the bald scalp showing around shorter hair)
+    const cutBase = () => {
+      ctx.save(); ctx.globalCompositeOperation = 'destination-out';
+      for (const s of ['hair', 'hat']) {
+        const p2 = c[s] && slot(s).options[c[s]];
+        if (p2 && p2.erase && images.get(p2.erase.src)) ctx.drawImage(images.get(p2.erase.src), p2.erase.x, p2.erase.y, p2.erase.w, p2.erase.h);
+      }
+      ctx.restore();
+    };
     for (const name of P.order) {
-      if (name === 'number') { drawNumber(ctx, opts.number); continue; }
+      if (name === 'number') { cutBase(); drawNumber(ctx, opts.number); continue; }
       const def = slot(name);
       let key;
       if (name === 'body') key = has('body', opts.body) ? opts.body : 'skater';
