@@ -74,20 +74,27 @@
     return cv;
   }
 
+  // Jersey number: chunky pixel digits rotated to run along the sleeve, like the original player art
+  const DIGITS = {
+    0: ['01110', '11011', '11011', '11011', '11011', '11011', '01110'], 1: ['00110', '01110', '00110', '00110', '00110', '00110', '01111'],
+    2: ['01110', '11011', '00011', '00110', '01100', '11000', '11111'], 3: ['11110', '00011', '00011', '01110', '00011', '00011', '11110'],
+    4: ['00011', '00111', '01011', '11011', '11111', '00011', '00011'], 5: ['11111', '11000', '11110', '00011', '00011', '11011', '01110'],
+    6: ['01110', '11000', '11110', '11011', '11011', '11011', '01110'], 7: ['11111', '00011', '00011', '00110', '00110', '00110', '00110'],
+    8: ['01110', '11011', '11011', '01110', '11011', '11011', '01110'], 9: ['01110', '11011', '11011', '01111', '00011', '00011', '01110'] };
   function drawNumber(ctx, n) {
     const spec = P.number; const s = String(n ?? '').replace(/\D/g, '').slice(0, 2);
     if (!spec || !s) return;
-    const DIG = { 0: ['111', '101', '101', '101', '111'], 1: ['010', '110', '010', '010', '111'], 2: ['111', '001', '111', '100', '111'],
-      3: ['111', '001', '111', '001', '111'], 4: ['101', '101', '111', '001', '001'], 5: ['111', '100', '111', '001', '111'],
-      6: ['111', '100', '111', '101', '111'], 7: ['111', '001', '001', '010', '010'], 8: ['111', '101', '111', '101', '111'], 9: ['111', '101', '111', '001', '111'] };
-    const [x0, y0] = s.length === 2 ? spec.at.two : spec.at.one, u = spec.px;
-    for (const [col, off] of [[spec.shadow, 1], [spec.color, 0]]) {
-      if (!col) continue;
-      ctx.fillStyle = col;
-      [...s].forEach((ch, k) => DIG[ch].forEach((row, j) => [...row].forEach((c, i) => {
-        if (c === '1') ctx.fillRect(x0 + (k * spec.spacing + i) * u + off * 2, y0 + j * u + off * 2, u, u);
-      })));
-    }
+    // draw the 5x7 digits as crisp blocks at full size, then rotate smoothly onto the sleeve
+    const u = spec.unit, w = (s.length * 6 - 1) * u, h = 7 * u, g = document.createElement('canvas');
+    g.width = w; g.height = h;
+    const gx = g.getContext('2d'); gx.fillStyle = spec.color;
+    [...s].forEach((ch, k) => DIGITS[ch].forEach((row, j) => [...row].forEach((c, i) => { if (c === '1') gx.fillRect((k * 6 + i) * u, j * u, u, u); })));
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.translate(spec.center[0], spec.center[1]);
+    ctx.rotate((spec.angle || 0) * Math.PI / 180);
+    ctx.drawImage(g, -w / 2, -h / 2);
+    ctx.restore();
   }
 
   // Render onto a full-size canvas. opts: { body: 'skater'|'goalie', number, captain }

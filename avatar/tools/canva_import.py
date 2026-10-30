@@ -158,7 +158,8 @@ def main():
         'note': 'Built by tools/canva_import.py from Canva exports. Parts are PNG layers at their x,y on the 500x500 canvas.',
         'ramps': {'hair': HAIR, 'gear': GEAR},
         'order': ['body', 'skin', 'number', 'captain', 'facialHair', 'hair', 'glasses', 'earring', 'hat'],
-        'number': {'color': '#d64c1e', 'shadow': '#5a1a0a', 'px': 5, 'at': {'one': [105, 205], 'two': [95, 205]}, 'spacing': 4},
+        # jersey number on the sleeve: centre point, rotation (degrees, clockwise) and pixel size, measured from the original art
+        'number': {'color': '#d4511f', 'center': [106, 213], 'angle': 38, 'unit': 3},
         'slots': {
             'body': {'fixed': True, 'options': {}},
             'skin': {'label': 'Skin', 'options': {'default': {'label': 'Default', 'none': True}}},
