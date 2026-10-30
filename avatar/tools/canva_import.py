@@ -95,6 +95,25 @@ def remove_background(a):
     return out
 
 
+def align(base, var, max_shift=12):
+    """AI editors sometimes redraw the whole picture a few pixels off. Find the shift that best lines up
+    the body (below the head) with the base and apply it, so only the real change is left."""
+    def gray(a): return a[260:470, 40:460, :3].astype(float).mean(-1)
+    g0 = gray(base)
+    best = (np.abs(gray(var) - g0).mean(), 0, 0)
+    for dy in range(-max_shift, max_shift + 1, 2):
+        for dx in range(-max_shift, max_shift + 1, 2):
+            e = np.abs(gray(np.roll(var, (dy, dx), (0, 1))) - g0).mean()
+            if e < best[0]: best = (e, dy, dx)
+    _, dy, dx = best
+    for ddy in (dy - 1, dy, dy + 1):                      # refine to 1px
+        for ddx in (dx - 1, dx, dx + 1):
+            e = np.abs(gray(np.roll(var, (ddy, ddx), (0, 1))) - g0).mean()
+            if e < best[0]: best = (e, ddy, ddx)
+    err, dy, dx = best
+    return np.roll(var, (dy, dx), (0, 1)), (dy, dx), err
+
+
 def diff_layer(base, var, region):
     x0, y0, x1, y1 = region
     d = np.abs(var[..., :3] - base[..., :3]).max(-1)
@@ -200,7 +219,10 @@ def main():
             continue
         name = m.group(2) or (m.group(1) if m.group(1) != kind else kind)
         name = re.sub(r'[^a-z0-9]+', '_', name).strip('_')
-        layer = diff_layer(base, load(path), REGIONS[kind])
+        var, (dy, dx), err = align(base, load(path))
+        note = f'  [re-aligned by {dx},{dy}px]' if (dx or dy) else ''
+        if err > 12: note += f'  [WARNING: rest of the picture differs from the base (avg {err:.0f}); the AI may have redrawn it]'
+        layer = diff_layer(base, var, REGIONS[kind])
         out_name = f'{kind}_{name}.png'
         box = crop_save(layer, os.path.join(img_dir, out_name))
         if not box:
@@ -214,7 +236,7 @@ def main():
             part['lum'] = lum_range(layer); part['native'] = closest_ramp(layer, GEAR)
             part['clipHairAbove'] = int(box['y'] + box['h'] * 0.75)   # hair is hidden under the crown of the hat
         S[slot]['options']['C' if kind == 'captain' else name] = part
-        print(f'{slot}: {name}  ({box["w"]}x{box["h"]} at {box["x"]},{box["y"]})')
+        print(f'{slot}: {name}  ({box["w"]}x{box["h"]} at {box["x"]},{box["y"]}){note}')
     json.dump(parts, open(os.path.join(dst, 'parts.json'), 'w'), indent=1)
     print('wrote', os.path.join(dst, 'parts.json'))
 
