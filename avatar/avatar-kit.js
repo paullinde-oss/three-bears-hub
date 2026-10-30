@@ -1,142 +1,152 @@
 /*
- * AvatarKit: a self-contained pixel avatar renderer and editor.
+ * AvatarKit: a self-contained layered avatar renderer and editor.
  *
- * Usage:
- *   await AvatarKit.load('avatar/parts.json');            // or pass the parsed object
- *   const url = AvatarKit.toDataURL(config, { crop: true, scale: 3, number: 7, captain: true });
+ *   await AvatarKit.load('avatar/parts.json');
+ *   img.src = AvatarKit.toDataURL(config, { crop: true, size: 160, number: 7, captain: true });
  *   AvatarKit.openEditor({ config, number: 7, body: 'goalie', onSave: cfg => ... });
  *
- * Parts format (parts.json): every part is { x, y, rows, pal? } on a size[0] x size[1] canvas.
- * In rows, '.' is transparent, '0'-'4' are shade levels tinted with the slot's colour ramp
- * (dark -> light), and any other character indexes into the part's own `pal` list.
+ * parts.json (built by tools/canva_import.py) lists PNG layers. Each part is { src, x, y, w, h } on a
+ * size[0] x size[1] canvas, so layers simply stack in `order`. Parts in a slot with `tint` can be
+ * recoloured: their brightness is mapped onto a 5-stop colour ramp (dark -> light), except when the
+ * chosen colour is the part's `native` colour, which draws the original art untouched.
  * No dependencies; drop the avatar/ folder into any project.
  */
 (function (global) {
   'use strict';
 
-  const FIXED_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&*+<=>?@^~';
-  let P = null;                // loaded parts
-  const cache = new Map();     // rendered data URLs keyed by config + options
+  let P = null, BASE = '';
+  const images = new Map();    // src -> HTMLImageElement
+  const tinted = new Map();    // src|colour -> canvas
+  const cache = new Map();     // rendered data URLs
 
-  // Which config key picks the colour ramp for each tint channel
-  const TINT_KEY = { skin: ['skin', 'skin'], eyes: ['eyes', 'eyeColor'], hair: ['hair', 'hairColor'],
-                     facialHair: ['hair', 'facialHairColor'], gear: ['gear', 'hatColor'] };
+  const DEFAULTS = { v: 2, skin: 'default', hair: null, hairColor: 'brown', facialHair: null, facialHairColor: 'brown',
+                     hat: null, hatColor: 'navy', glasses: null, earring: null };
 
-  const DEFAULTS = {
-    v: 1, skin: 'light', eyes: 'normal', eyeColor: 'brown', brows: 'normal', mouth: 'smile',
-    hair: 'crew', hairColor: 'brown', facialHair: null, facialHairColor: 'brown',
-    hat: null, hatColor: 'navy', glasses: null, earring: null
-  };
-
-  function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+  const hex = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+  const loadImg = src => new Promise((res, rej) => {
+    const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Could not load ' + src)); im.src = BASE + src;
+  });
 
   async function load(src) {
-    P = typeof src === 'string' ? await (await fetch(src)).json() : src;
-    // pre-parse colours
-    for (const kind of Object.keys(P.ramps))
-      for (const name of Object.keys(P.ramps[kind]))
-        P.ramps[kind][name] = P.ramps[kind][name].map(c => typeof c === 'string' ? hexToRgb(c) : c);
+    if (typeof src === 'string') { BASE = src.replace(/[^/]*$/, ''); P = await (await fetch(src)).json(); }
+    else P = src;
+    images.clear(); tinted.clear(); cache.clear();
+    const all = [];
     for (const slot of Object.values(P.slots))
       for (const part of Object.values(slot.options || {}))
-        if (part.pal) part._pal = part.pal.map(hexToRgb);
-    cache.clear();
+        if (part.src && !images.has(part.src)) { images.set(part.src, null); all.push(loadImg(part.src).then(im => images.set(part.src, im))); }
+    await Promise.all(all);
     return P;
   }
 
+  const slot = name => P.slots[name] || { options: {} };
+  const has = (name, key) => !!(slot(name).options || {})[key];
+
   function normalize(cfg) {
     const c = Object.assign({}, DEFAULTS, cfg || {});
-    const ok = (slot, v) => v == null ? (P.slots[slot].optional ? null : Object.keys(P.slots[slot].options)[0])
-                                      : (P.slots[slot].options[v] ? v : Object.keys(P.slots[slot].options)[0]);
-    c.eyes = ok('eyes', c.eyes); c.brows = ok('brows', c.brows); c.mouth = ok('mouth', c.mouth);
-    for (const s of ['hair', 'facialHair', 'hat', 'glasses', 'earring']) c[s] = c[s] == null ? null : (P.slots[s].options[c[s]] ? c[s] : null);
-    const ramp = (kind, v, d) => P.ramps[kind][v] ? v : d;
-    c.skin = ramp('skin', c.skin, 'light'); c.eyeColor = ramp('eyes', c.eyeColor, 'brown');
-    c.hairColor = ramp('hair', c.hairColor, 'brown'); c.facialHairColor = ramp('hair', c.facialHairColor, c.hairColor);
-    c.hatColor = ramp('gear', c.hatColor, 'navy');
+    for (const s of ['hair', 'facialHair', 'hat', 'glasses', 'earring']) c[s] = c[s] && has(s, c[s]) ? c[s] : null;
+    if (!has('skin', c.skin)) c.skin = Object.keys(slot('skin').options)[0] || 'default';
+    const ramps = P.ramps || {};
+    if (!(ramps.hair || {})[c.hairColor]) c.hairColor = 'brown';
+    if (!(ramps.hair || {})[c.facialHairColor]) c.facialHairColor = c.hairColor;
+    if (!(ramps.gear || {})[c.hatColor]) c.hatColor = 'navy';
     return c;
   }
 
-  function blit(buf, W, part, ramp, clipAbove) {
-    const pal = part._pal;
-    for (let j = 0; j < part.rows.length; j++) {
-      const y = part.y + j;
-      if (clipAbove != null && y < clipAbove) continue;
-      const row = part.rows[j];
-      for (let i = 0; i < row.length; i++) {
-        const ch = row[i];
-        if (ch === '.') continue;
-        let rgb;
-        if (ch >= '0' && ch <= '4') { if (!ramp) continue; rgb = ramp[ch.charCodeAt(0) - 48]; }
-        else rgb = pal[FIXED_CHARS.indexOf(ch)];
-        if (!rgb) continue;
-        const o = (y * W + part.x + i) * 4;
-        buf[o] = rgb[0]; buf[o + 1] = rgb[1]; buf[o + 2] = rgb[2]; buf[o + 3] = 255;
-      }
+  // Recoloured copy of a part: brightness (normalised by the part's own range) -> colour ramp
+  function tintedCanvas(part, rampName, ramp) {
+    const key = part.src + '|' + rampName;
+    if (tinted.has(key)) return tinted.get(key);
+    const im = images.get(part.src);
+    const cv = document.createElement('canvas'); cv.width = part.w; cv.height = part.h;
+    const ctx = cv.getContext('2d'); ctx.drawImage(im, 0, 0);
+    const d = ctx.getImageData(0, 0, part.w, part.h), px = d.data;
+    const stops = ramp.map(hex), [lo, hi] = part.lum || [0, 255], span = Math.max(1, hi - lo);
+    for (let i = 0; i < px.length; i += 4) {
+      if (!px[i + 3]) continue;
+      let t = ((0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]) - lo) / span;
+      t = Math.min(1, Math.max(0, t)) * (stops.length - 1);
+      const k = Math.min(stops.length - 2, Math.floor(t)), f = t - k, a = stops[k], b = stops[k + 1];
+      px[i] = a[0] + (b[0] - a[0]) * f; px[i + 1] = a[1] + (b[1] - a[1]) * f; px[i + 2] = a[2] + (b[2] - a[2]) * f;
     }
-  }
-
-  function drawNumber(buf, W, n) {
-    const spec = P.slots.number; const s = String(n).replace(/\D/g, '').slice(0, 2);
-    if (!s) return;
-    const [x0, y0] = s.length === 2 ? spec.at.two : spec.at.one;
-    const rgb = hexToRgb(spec.color);
-    [...s].forEach((d, k) => spec.digits[d].forEach((row, j) => [...row].forEach((c, i) => {
-      if (c !== '1') return;
-      const o = ((y0 + j) * W + x0 + k * spec.spacing + i) * 4;
-      buf[o] = rgb[0]; buf[o + 1] = rgb[1]; buf[o + 2] = rgb[2]; buf[o + 3] = 255;
-    })));
-  }
-
-  // Render to a size x size canvas. opts: { body: 'skater'|'goalie', number, captain }
-  function render(cfg, opts = {}) {
-    if (!P) throw new Error('AvatarKit.load() first');
-    const c = normalize(cfg); const [W, H] = P.size;
-    const buf = new Uint8ClampedArray(W * H * 4);
-    const rampFor = slot => { const t = TINT_KEY[P.slots[slot].tint]; return t ? P.ramps[t[0]][c[t[1]]] : null; };
-    for (const slot of P.order) {
-      const def = P.slots[slot];
-      if (slot === 'number') { if (opts.number != null && opts.number !== '') drawNumber(buf, W, opts.number); continue; }
-      if (slot === 'captain') { if (opts.captain) blit(buf, W, def.options.C, null); continue; }
-      let key;
-      if (slot === 'body') key = def.options[opts.body] ? opts.body : 'skater';
-      else if (def.options.default) key = 'default';
-      else key = c[slot];
-      if (!key) continue;
-      const clip = slot === 'hair' && c.hat ? P.slots.hat.clipHairAbove : null;
-      blit(buf, W, def.options[key], rampFor(slot), clip);
-    }
-    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-    cv.getContext('2d').putImageData(new ImageData(buf, W, H), 0, 0);
+    ctx.putImageData(d, 0, 0);
+    tinted.set(key, cv);
     return cv;
   }
 
-  // PNG data URL. opts.crop = true gives the head-and-shoulders profile crop.
+  function drawNumber(ctx, n) {
+    const spec = P.number; const s = String(n ?? '').replace(/\D/g, '').slice(0, 2);
+    if (!spec || !s) return;
+    const DIG = { 0: ['111', '101', '101', '101', '111'], 1: ['010', '110', '010', '010', '111'], 2: ['111', '001', '111', '100', '111'],
+      3: ['111', '001', '111', '001', '111'], 4: ['101', '101', '111', '001', '001'], 5: ['111', '100', '111', '001', '111'],
+      6: ['111', '100', '111', '101', '111'], 7: ['111', '001', '001', '010', '010'], 8: ['111', '101', '111', '101', '111'], 9: ['111', '101', '111', '001', '111'] };
+    const [x0, y0] = s.length === 2 ? spec.at.two : spec.at.one, u = spec.px;
+    for (const [col, off] of [[spec.shadow, 1], [spec.color, 0]]) {
+      if (!col) continue;
+      ctx.fillStyle = col;
+      [...s].forEach((ch, k) => DIG[ch].forEach((row, j) => [...row].forEach((c, i) => {
+        if (c === '1') ctx.fillRect(x0 + (k * spec.spacing + i) * u + off * 2, y0 + j * u + off * 2, u, u);
+      })));
+    }
+  }
+
+  // Render onto a full-size canvas. opts: { body: 'skater'|'goalie', number, captain }
+  function render(cfg, opts = {}) {
+    if (!P) throw new Error('AvatarKit.load() first');
+    const c = normalize(cfg); const [W, H] = P.size;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const hatPart = c.hat ? slot('hat').options[c.hat] : null;
+    for (const name of P.order) {
+      if (name === 'number') { drawNumber(ctx, opts.number); continue; }
+      const def = slot(name);
+      let key;
+      if (name === 'body') key = has('body', opts.body) ? opts.body : 'skater';
+      else if (name === 'captain') key = opts.captain ? 'C' : null;
+      else key = c[name];
+      const part = key && def.options[key];
+      if (!part || part.none || !images.get(part.src)) continue;
+      let src = images.get(part.src);
+      if (def.tint && def.colorKey) {
+        const colour = c[def.colorKey];
+        if (colour && colour !== part.native && P.ramps[def.tint][colour]) src = tintedCanvas(part, colour, P.ramps[def.tint][colour]);
+      }
+      if (name === 'hair' && hatPart && hatPart.clipHairAbove != null) {
+        const cut = Math.max(0, hatPart.clipHairAbove - part.y);       // hide hair under the crown of the hat
+        if (cut < part.h) ctx.drawImage(src, 0, cut, part.w, part.h - cut, part.x, part.y + cut, part.w, part.h - cut);
+        continue;
+      }
+      ctx.drawImage(src, part.x, part.y, part.w, part.h);
+    }
+    return cv;
+  }
+
+  // PNG data URL. opts.crop gives the head-and-shoulders profile picture; opts.size is the output width in px.
   function toDataURL(cfg, opts = {}) {
-    const key = JSON.stringify([normalize(cfg), opts.body || 'skater', opts.number ?? '', !!opts.captain, !!opts.crop, opts.scale || 1]);
+    const r = opts.crop ? P.crop : { x: 0, y: 0, w: P.size[0], h: P.size[1] };
+    const size = opts.size || r.w;
+    const key = JSON.stringify([normalize(cfg), opts.body || 'skater', opts.number ?? '', !!opts.captain, !!opts.crop, size]);
     if (cache.has(key)) return cache.get(key);
     const src = render(cfg, opts);
-    const r = opts.crop ? P.crop : { x: 0, y: 0, w: P.size[0], h: P.size[1] };
-    const s = opts.scale || 1;
-    const out = document.createElement('canvas'); out.width = r.w * s; out.height = r.h * s;
-    const ctx = out.getContext('2d'); ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(src, r.x, r.y, r.w, r.h, 0, 0, r.w * s, r.h * s);
+    const out = document.createElement('canvas'); out.width = size; out.height = Math.round(size * r.h / r.w);
+    const ctx = out.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, r.x, r.y, r.w, r.h, 0, 0, out.width, out.height);
     const url = out.toDataURL('image/png');
-    if (cache.size > 400) cache.clear();
+    if (cache.size > 300) cache.clear();
     cache.set(key, url);
     return url;
   }
 
   function random() {
     const pick = a => a[Math.floor(Math.random() * a.length)];
-    const opt = s => Object.keys(P.slots[s].options);
+    const keys = s => Object.keys(slot(s).options || {});
     const hairColor = pick(Object.keys(P.ramps.hair));
+    const maybe = (s, p) => keys(s).length && Math.random() < p ? pick(keys(s)) : null;
     return normalize({
-      skin: pick(Object.keys(P.ramps.skin)), eyes: pick(opt('eyes')), eyeColor: pick(Object.keys(P.ramps.eyes)),
-      brows: pick(opt('brows')), mouth: pick(opt('mouth')),
-      hair: Math.random() < 0.1 ? null : pick(opt('hair')), hairColor,
-      facialHair: Math.random() < 0.4 ? null : pick(opt('facialHair')), facialHairColor: hairColor,
-      hat: Math.random() < 0.75 ? null : pick(opt('hat')), hatColor: pick(Object.keys(P.ramps.gear)),
-      glasses: Math.random() < 0.8 ? null : pick(opt('glasses')), earring: Math.random() < 0.85 ? null : pick(opt('earring'))
+      skin: pick(keys('skin')), hair: Math.random() < 0.9 ? maybe('hair', 1) : null, hairColor,
+      facialHair: maybe('facialHair', 0.6), facialHairColor: hairColor,
+      hat: maybe('hat', 0.25), hatColor: pick(Object.keys(P.ramps.gear)),
+      glasses: maybe('glasses', 0.2), earring: maybe('earring', 0.15)
     });
   }
 
@@ -149,20 +159,20 @@
   .avk-x{background:none;border:none;font-size:24px;cursor:pointer;color:#777;line-height:1}
   .avk-body{display:flex;gap:14px;padding:14px 16px;overflow:auto;flex:1;min-height:0}
   .avk-stage{flex:0 0 300px;display:flex;flex-direction:column;align-items:center;gap:10px}
-  .avk-full{width:300px;height:300px;image-rendering:pixelated;background:radial-gradient(circle at 50% 40%,#e7eef4,#c9d7e2);border-radius:12px;border:1px solid #c5d3df}
+  .avk-full{width:300px;height:300px;background:radial-gradient(circle at 50% 40%,#e7eef4,#c9d7e2);border-radius:12px;border:1px solid #c5d3df}
   .avk-crop-row{display:flex;align-items:center;gap:10px;font-size:12px;color:#666}
-  .avk-crop{width:72px;height:72px;border-radius:50%;image-rendering:pixelated;background:#f2ede2;border:2px solid #ddd3bf}
+  .avk-crop{width:72px;height:72px;border-radius:50%;background:#f2ede2;border:2px solid #ddd3bf}
   .avk-side{flex:1;min-width:0;display:flex;flex-direction:column}
   .avk-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid #ddd3bf;margin-bottom:10px;scrollbar-width:none}
   .avk-tabs::-webkit-scrollbar{display:none}
   .avk-tab{background:none;border:none;padding:8px 10px;font-size:13px;font-weight:600;color:#777;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
   .avk-tab.on{color:#1a1a1a;border-bottom-color:#c75a2c}
   .avk-sec{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#888;margin:10px 0 6px;font-weight:700}
-  .avk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px}
-  .avk-opt{background:#fff;border:2px solid #e2d9c6;border-radius:10px;padding:4px 2px 2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;font-size:10px;color:#555}
-  .avk-opt img{width:60px;height:60px;image-rendering:pixelated}
+  .avk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:8px}
+  .avk-opt{background:#fff;border:2px solid #e2d9c6;border-radius:10px;padding:4px 2px 2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;font-size:10px;color:#555;text-align:center}
+  .avk-opt img{width:64px;height:64px;border-radius:50%}
   .avk-opt.on{border-color:#c75a2c;box-shadow:0 0 0 2px rgba(199,90,44,.25)}
-  .avk-none{width:60px;height:60px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#bbb}
+  .avk-none{width:64px;height:64px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#bbb}
   .avk-sw{display:flex;flex-wrap:wrap;gap:8px}
   .avk-dot{width:30px;height:30px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #ccc;cursor:pointer}
   .avk-dot.on{box-shadow:0 0 0 3px #c75a2c}
@@ -177,11 +187,9 @@
     const st = document.createElement('style'); st.id = 'avk-css'; st.textContent = CSS; document.head.appendChild(st);
   }
 
+  // Tabs only appear when parts.json has options for them
   const TABS = [
-    { id: 'skin', label: 'Skin', parts: [], colors: [['skin', 'skin', 'Skin tone']] },
-    { id: 'eyes', label: 'Eyes', parts: [['eyes', 'Eye shape']], colors: [['eyeColor', 'eyes', 'Eye colour']] },
-    { id: 'brows', label: 'Brows', parts: [['brows', 'Eyebrows']], colors: [['hairColor', 'hair', 'Colour (matches hair)']] },
-    { id: 'mouth', label: 'Mouth', parts: [['mouth', 'Mouth']], colors: [] },
+    { id: 'skin', label: 'Skin', parts: [['skin', 'Skin tone']], colors: [] },
     { id: 'hair', label: 'Hair', parts: [['hair', 'Hairstyle']], colors: [['hairColor', 'hair', 'Hair colour']] },
     { id: 'facial', label: 'Facial Hair', parts: [['facialHair', 'Facial hair']], colors: [['facialHairColor', 'hair', 'Facial hair colour']] },
     { id: 'acc', label: 'Accessories', parts: [['hat', 'Hat'], ['glasses', 'Glasses'], ['earring', 'Earring']], colors: [['hatColor', 'gear', 'Hat colour']] },
@@ -192,7 +200,8 @@
     injectCSS();
     let cfg = normalize(o.config);
     const opts = { body: o.body || 'skater', number: o.number, captain: !!o.captain };
-    let tab = 'hair';
+    const tabs = TABS.filter(t => t.parts.some(([s]) => Object.keys(slot(s).options || {}).length > (s === 'skin' ? 1 : 0)));
+    let tab = (tabs.find(t => t.id === 'hair') || tabs[0] || {}).id;
     const ov = document.createElement('div'); ov.className = 'avk-ov';
     ov.innerHTML = `<div class="avk-panel" role="dialog" aria-label="Avatar editor">
       <div class="avk-head"><h3>${o.title || 'Edit Avatar'}</h3><button class="avk-x" data-a="cancel" aria-label="Close">×</button></div>
@@ -205,37 +214,33 @@
         <div style="display:flex;gap:8px"><button class="avk-btn ghost" data-a="cancel">Cancel</button><button class="avk-btn go" data-a="save">Save</button></div></div>
     </div>`;
     const $ = s => ov.querySelector(s);
-    // option thumbnails: no number/captain badge, and hairstyles are shown without a hat
-    const thumb = (c, slot) => toDataURL(slot === 'hair' ? Object.assign({}, c, { hat: null }) : c,
-                                         { body: opts.body, crop: true, scale: 2 });
+    // option thumbnails: no number/captain, and hairstyles are shown without a hat
+    const thumb = (c, s) => toDataURL(s === 'hair' ? Object.assign({}, c, { hat: null }) : c, { body: opts.body, crop: true, size: 128 });
 
     function paint() {
-      $('.avk-full').src = toDataURL(cfg, Object.assign({}, opts, { scale: 3 }));
-      $('.avk-crop').src = toDataURL(cfg, Object.assign({}, opts, { crop: true, scale: 2 }));
-      $('.avk-tabs').innerHTML = TABS.map(t => `<button class="avk-tab${t.id === tab ? ' on' : ''}" data-tab="${t.id}">${t.label}</button>`).join('');
-      const t = TABS.find(x => x.id === tab);
+      $('.avk-full').src = toDataURL(cfg, Object.assign({}, opts, { size: 600 }));
+      $('.avk-crop').src = toDataURL(cfg, Object.assign({}, opts, { crop: true, size: 144 }));
+      $('.avk-tabs').innerHTML = tabs.map(t => `<button class="avk-tab${t.id === tab ? ' on' : ''}" data-tab="${t.id}">${t.label}</button>`).join('');
+      const t = tabs.find(x => x.id === tab);
       let h = '';
-      for (const [slot, title] of t.parts) {
-        const def = P.slots[slot];
-        h += `<div class="avk-sec">${title}</div><div class="avk-grid">`;
-        if (def.optional) h += `<div class="avk-opt${cfg[slot] == null ? ' on' : ''}" data-slot="${slot}" data-v=""><div class="avk-none">${slot === 'hair' ? '' : '∅'}${slot === 'hair' ? `<img src="${thumb(Object.assign({}, cfg, { hair: null }), 'hair')}" alt="">` : ''}</div>${def.noneLabel || 'None'}</div>`;
-        for (const [k, part] of Object.entries(def.options)) {
-          const c2 = Object.assign({}, cfg, { [slot]: k });
-          h += `<div class="avk-opt${cfg[slot] === k ? ' on' : ''}" data-slot="${slot}" data-v="${k}"><img src="${thumb(c2, slot)}" alt="">${part.label || k}</div>`;
+      if (t) {
+        for (const [s, title] of t.parts) {
+          const def = slot(s), entries = Object.entries(def.options || {});
+          if (!entries.length) continue;
+          h += `<div class="avk-sec">${title}</div><div class="avk-grid">`;
+          if (def.optional) h += `<div class="avk-opt${cfg[s] == null ? ' on' : ''}" data-slot="${s}" data-v="">${s === 'hair'
+            ? `<img src="${thumb(Object.assign({}, cfg, { hair: null }), 'hair')}" alt="">` : '<div class="avk-none">∅</div>'}${def.noneLabel || 'None'}</div>`;
+          for (const [k, part] of entries)
+            h += `<div class="avk-opt${cfg[s] === k ? ' on' : ''}" data-slot="${s}" data-v="${k}"><img src="${thumb(Object.assign({}, cfg, { [s]: k }), s)}" alt="">${part.label || k}</div>`;
+          h += '</div>';
         }
-        h += '</div>';
-      }
-      for (const [key, kind, title] of t.colors) {
-        h += `<div class="avk-sec">${title}</div><div class="avk-sw">`;
-        for (const [name, ramp] of Object.entries(P.ramps[kind])) {
-          const c = ramp[3];
-          h += `<div class="avk-dot${cfg[key] === name ? ' on' : ''}" title="${name.replace(/_/g, ' ')}" data-color="${key}" data-v="${name}" style="background:rgb(${c[0]},${c[1]},${c[2]})"></div>`;
+        for (const [key, kind, title] of t.colors) {
+          if (key === 'hatColor' && !cfg.hat) continue;
+          h += `<div class="avk-sec">${title}</div><div class="avk-sw">`;
+          for (const [name, ramp] of Object.entries(P.ramps[kind] || {}))
+            h += `<div class="avk-dot${cfg[key] === name ? ' on' : ''}" title="${name.replace(/_/g, ' ')}" data-color="${key}" data-v="${name}" style="background:${ramp[3]}"></div>`;
+          h += '</div>';
         }
-        h += '</div>';
-      }
-      if (tab === 'skin') {
-        h += `<div class="avk-sec">Preview</div><div class="avk-grid">` + Object.keys(P.ramps.skin).map(n =>
-          `<div class="avk-opt${cfg.skin === n ? ' on' : ''}" data-color="skin" data-v="${n}"><img src="${thumb(Object.assign({}, cfg, { skin: n }))}" alt="">${n}</div>`).join('') + '</div>';
       }
       $('.avk-pane').innerHTML = h;
     }
@@ -246,14 +251,9 @@
       const el = e.target.closest('[data-a],[data-tab],[data-slot],[data-color]');
       if (!el) { if (e.target === ov) { close(); o.onCancel && o.onCancel(); } return; }
       if (el.dataset.tab) { tab = el.dataset.tab; paint(); return; }
-      if (el.dataset.slot) {
-        const v = el.dataset.v || null;
-        cfg = normalize(Object.assign({}, cfg, { [el.dataset.slot]: v }));
-        paint(); return;
-      }
+      if (el.dataset.slot) { cfg = normalize(Object.assign({}, cfg, { [el.dataset.slot]: el.dataset.v || null })); paint(); return; }
       if (el.dataset.color) {
-        const k = el.dataset.color, v = el.dataset.v;
-        const patch = { [k]: v };
+        const k = el.dataset.color, v = el.dataset.v, patch = { [k]: v };
         if (k === 'hairColor' && cfg.facialHairColor === cfg.hairColor) patch.facialHairColor = v;  // beard follows hair until changed
         cfg = normalize(Object.assign({}, cfg, patch)); paint(); return;
       }

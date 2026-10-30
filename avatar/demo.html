@@ -7,7 +7,7 @@
 <style>
   body{font-family:system-ui,sans-serif;background:#f4efe3;margin:0;padding:20px;color:#1a1a1a}
   .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
-  img.pix{image-rendering:pixelated;border-radius:50%;background:#fff;border:2px solid #ddd3bf}
+  img.pix{border-radius:50%;background:#fff;border:2px solid #ddd3bf}
   button{padding:10px 16px;border-radius:8px;border:none;background:#c75a2c;color:#fff;font-weight:700;cursor:pointer}
   pre{background:#fff;padding:10px;border-radius:8px;font-size:12px;overflow:auto}
 </style>
@@ -26,7 +26,7 @@ function show() {
 }
 function team() {
   document.getElementById('faces').innerHTML = Array.from({ length: 8 }, (_, i) =>
-    `<img class="pix" width="96" height="96" src="${AvatarKit.toDataURL(AvatarKit.random(), { crop: true, scale: 3, number: i * 7 + 2, captain: i === 0 })}">`).join('');
+    `<img class="pix" width="96" height="96" src="${AvatarKit.toDataURL(AvatarKit.random(), { crop: true, size: 192, number: i * 7 + 2, captain: i === 0 })}">`).join('');
 }
 AvatarKit.load('parts.json').then(() => {
   cfg = AvatarKit.defaults(); team(); show();

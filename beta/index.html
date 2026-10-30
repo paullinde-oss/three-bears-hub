@@ -1083,7 +1083,7 @@ function avatarOptsFor(player) {
 function avatarUrl(player, full) {
   const cfg = player && avatarsCache[player.id];
   if (!cfg || !avatarKitReady) return null;
-  return AvatarKit.toDataURL(cfg, Object.assign(avatarOptsFor(player), full ? { scale: 3 } : { crop: true, scale: 3 }));
+  return AvatarKit.toDataURL(cfg, Object.assign(avatarOptsFor(player), full ? { size: 400 } : { crop: true, size: 160 }));
 }
 function editAvatar(playerId) {
   const p = state.players.find(x => x.id === playerId);
@@ -1096,7 +1096,7 @@ function editAvatar(playerId) {
     config: avatarsCache[playerId], title: playerId === myPlayerId ? 'Edit Your Avatar' : `Edit Avatar: ${p.name}`,
     onSave: async cfg => {
       // Firebase drops nulls, so empty choices (e.g. bald, no hat) are stored as 'none'
-      const rec = { v: 1, updatedAt: Date.now() };
+      const rec = { v: 2, updatedAt: Date.now() };
       Object.entries(cfg).forEach(([k, v]) => { if (k !== 'v') rec[k] = v == null ? 'none' : String(v); });
       try {
         await dbRef('avatars/' + playerId).set(rec);
@@ -1119,7 +1119,7 @@ function renderAvatar(player, size, flip) {
   // Pixel avatars are never mirrored (the jersey number and captain C would read backwards)
   const pix = avatarUrl(player);
   if (pix) {
-    return `<img src="${pix}" style="width:${d}px;height:${d}px;border-radius:50%;flex-shrink:0;border:1px solid var(--line);background:#f2ede2;image-rendering:pixelated;" alt="">`;
+    return `<img src="${pix}" style="width:${d}px;height:${d}px;border-radius:50%;flex-shrink:0;border:1px solid var(--line);background:#f2ede2;" alt="">`;
   }
   const photo = player && player.photo;
   if (photo) {

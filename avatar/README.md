@@ -1,15 +1,14 @@
 # AvatarKit
 
-A self-contained pixel-art avatar renderer and editor. No build step, no dependencies.
+A self-contained layered avatar renderer and editor. No build step, no dependencies.
 Copy this folder into any project.
 
 | File | What it is |
 |---|---|
 | `avatar-kit.js` | Engine and editor (`window.AvatarKit`) |
-| `parts.json` | All body parts, face parts and colour ramps (~30 KB) |
+| `parts.json` + `img/` | The parts: PNG layers plus colour ramps (made by `tools/canva_import.py`) |
 | `demo.html` | Standalone test page |
-| `tools/parts_png.py` | Convert parts to and from PNG so you can draw them in any image editor |
-| `tools/build/` | The scripts that built the original parts from the team's player art (reference only) |
+| `tools/canva_import.py` | Turns Canva exports into `parts.json` + `img/` |
 
 ## Use it
 
@@ -18,11 +17,11 @@ Copy this folder into any project.
 <script>
   await AvatarKit.load('avatar/parts.json');
 
-  // Profile picture (head and shoulders) as a PNG data URL
-  img.src = AvatarKit.toDataURL(config, { crop: true, scale: 3, number: 7, captain: true });
+  // Profile picture (head and shoulders), 160px wide
+  img.src = AvatarKit.toDataURL(config, { crop: true, size: 160, number: 7, captain: true });
 
   // Full body
-  img.src = AvatarKit.toDataURL(config, { scale: 3, body: 'goalie' });
+  img.src = AvatarKit.toDataURL(config, { size: 400, body: 'goalie' });
 
   // Editor (full-screen overlay)
   AvatarKit.openEditor({ config, number: 7, captain: false, body: 'skater',
@@ -33,33 +32,38 @@ Copy this folder into any project.
 `config` is a small object you store per person, for example:
 
 ```json
-{"v":1,"skin":"light","eyes":"normal","eyeColor":"blue","brows":"thick","mouth":"grin",
- "hair":"mullet","hairColor":"brown","facialHair":"short","facialHairColor":"brown",
- "hat":null,"hatColor":"navy","glasses":null,"earring":null}
+{"v":2,"skin":"tan","hair":"mullet","hairColor":"ginger","facialHair":"full","facialHairColor":"ginger",
+ "hat":"cap","hatColor":"red","glasses":null,"earring":null}
 ```
 
 Unknown or missing values fall back to defaults, so old configs keep working when parts change.
 `number`, `captain` and `body` are passed at render time, not stored in the config, because they come from the roster.
+The editor only shows tabs for slots that have parts.
 
-## How parts work
+## Making parts in Canva
 
-The canvas is 100×100. Every part is drawn in the exact position it sits on the body, so parts simply stack in the order listed in `parts.json` → `order`.
+Every part is made by **editing a copy of one base image** in Canva and downloading it. Never move, resize or crop the image.
 
-In each part's `rows`:
+1. **`base.png`**: the bald, clean-shaven skater with the default face and a **blank sleeve** (no number; the app draws it).
+   Use the same 500×500 framing as the original player art.
+2. For each option, duplicate the base page, change only that one thing (e.g. Magic Edit → "short brown mullet"),
+   and download it as PNG. Name it by type:
 
-* `.` is transparent.
-* `0`–`4` are shade levels (outline, shadow, mid, base, highlight). They're recoloured by the slot's colour ramp: hair colour, skin tone, eye colour, and so on. That's why each hairstyle exists once but comes in every colour.
-* Any other character is a fixed colour from the part's `pal` list (eye whites, teeth, metal, the jersey).
+   | Type | File name | Notes |
+   |---|---|---|
+   | Skin tone | `skin_tan.png` | base with only the skin changed |
+   | Hair | `hair_mullet.png` | make every hairstyle **brown**; other colours are generated |
+   | Facial hair | `beard_full.png` | **brown** |
+   | Hat | `hat_cap.png` | any one colour; other colours are generated |
+   | Glasses / earring | `glasses_round.png`, `earring_gold.png` | |
+   | Captain | `captain.png` | base with the captain's C on the chest |
+   | Goalie | `goalie_base.png` | same bald player in goalie gear, head in the same spot |
 
-## Adding or changing parts (e.g. drawn in Canva)
+3. Put them all in one folder and run:
+   `python3 tools/canva_import.py <canva folder> .` (needs `pip install numpy pillow scipy`).
 
-1. Export a guide: `python3 tools/parts_png.py export parts.json body skater body.png` (and `head default head.png`).
-2. In your editor, make a 100×100 canvas (or 500×500, i.e. exactly 5×) with a transparent background. Put the guide PNGs on a locked layer underneath.
-3. Draw the new part in place. For anything that should follow the player's chosen colour, use only these greys:
-   `#000000` outline · `#404040` shadow · `#808080` mid · `#bfbfbf` base · `#ffffff` highlight.
-   Use any other colour for fixed details.
-4. Hide the guide layer and export a PNG with a transparent background. Turn anti-aliasing and smoothing off.
-5. Import it: `python3 tools/parts_png.py import parts.json hair pompadour pompadour.png`
+The script compares each image with `base.png` and keeps only what changed, so every part lines up exactly.
+If something extra gets picked up, it's because the AI edit changed pixels outside the part. Redo that edit, or adjust `REGIONS` at the top of the script.
 
-It appears in the editor straight away. Slots: `hair`, `facialHair`, `eyes`, `brows`, `mouth`, `hat`, `glasses`, `earring`, `body`.
-To add colours, add a 5-step ramp (dark → light) under `ramps`.
+Colours: hair, facial hair and hats are recoloured by mapping the art's brightness onto a 5-step ramp (`ramps` in `parts.json`).
+The colour the art was made in (`native`) is drawn untouched.
