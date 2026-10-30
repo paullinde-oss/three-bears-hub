@@ -35,6 +35,11 @@ REGIONS = {
     'earring':    (110, 110, 190, 200),
     'captain':    (90, 170, 220, 290),
 }
+# First word of a file/page name -> kind of part (names are case-insensitive; spaces, dashes and _ all work)
+ALIASES = {'skin': 'skin', 'hair': 'hair', 'beard': 'beard', 'facial': 'beard', 'facialhair': 'beard', 'mustache': 'beard',
+           'moustache': 'beard', 'hat': 'hat', 'cap': 'hat', 'toque': 'hat', 'glasses': 'glasses', 'sunglasses': 'glasses',
+           'earring': 'earring', 'captain': 'captain', 'eyes': 'eyes', 'eye': 'eyes', 'eyebrows': 'brows', 'brows': 'brows',
+           'mouth': 'mouth'}
 SLOT_OF = {'skin': 'skin', 'hair': 'hair', 'beard': 'facialHair', 'hat': 'hat', 'glasses': 'glasses',
            'earring': 'earring', 'captain': 'captain'}
 DIFF_T = 26          # per-channel difference that counts as "changed"
@@ -179,16 +184,21 @@ def main():
         stem = os.path.splitext(k)[0]
         if stem == 'base':
             continue
-        if stem == 'goalie_base':
+        stem = stem.strip()
+        if re.fullmatch(r'goalie([ _-]*base)?', stem):
             g = remove_background(load(path))
             S['body']['options']['goalie'] = dict(src='img/body_goalie.png', **crop_save(g, os.path.join(img_dir, 'body_goalie.png')), label='Goalie')
             print('body: goalie')
             continue
-        m = re.fullmatch(r'(skin|hair|beard|hat|glasses|earring|captain)(?:_(.+))?', stem)
-        if not m:
-            print(f'skipped {k} (unknown name)')
+        m = re.fullmatch(r'([a-z]+)(?:[ _-]+(.+))?', stem)
+        kind = ALIASES.get(m.group(1)) if m else None
+        if not kind:
+            print(f'skipped {k} (name must start with a part type: {", ".join(sorted(set(ALIASES)))})')
             continue
-        kind, name = m.group(1), (m.group(2) or m.group(1))
+        if kind in ('eyes', 'brows', 'mouth'):
+            print(f'skipped {k}: face options are not supported yet')
+            continue
+        name = m.group(2) or (m.group(1) if m.group(1) != kind else kind)
         name = re.sub(r'[^a-z0-9]+', '_', name).strip('_')
         layer = diff_layer(base, load(path), REGIONS[kind])
         out_name = f'{kind}_{name}.png'
