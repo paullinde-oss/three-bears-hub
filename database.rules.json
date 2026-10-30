@@ -1,0 +1,57 @@
+{
+  "rules": {
+    "$env": {
+      ".validate": "$env === 'hub' || $env === 'hubdev'",
+
+      "three-bears-state-v3": {
+        ".read": true,
+        ".write": "auth != null && root.child($env).child('admins').child(auth.uid).val() === true",
+        ".validate": "newData.hasChildren(['value', 'ts']) && newData.child('value').isString()"
+      },
+      "three-bears-state-v2": { ".read": true },
+
+      "avatars": {
+        ".read": true,
+        "$playerId": {
+          ".write": "auth != null && (root.child($env).child('admins').child(auth.uid).val() === true || root.child($env).child('users').child(auth.uid).child('playerId').val() === $playerId)",
+          ".validate": "newData.hasChildren(['v'])",
+          "v": { ".validate": "newData.isNumber()" },
+          "updatedAt": { ".validate": "newData.isNumber()" },
+          "$field": { ".validate": "$field.matches(/^(skin|eyes|eyeColor|brows|mouth|hair|hairColor|facialHair|facialHairColor|hat|hatColor|glasses|earring)$/) && newData.isString() && newData.val().length <= 24" }
+        }
+      },
+
+      "users": {
+        ".read": "auth != null && root.child($env).child('admins').child(auth.uid).val() === true",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && root.child($env).child('admins').child(auth.uid).val() === true",
+          "playerId": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && auth.token.email != null && root.child($env).child('phoneIndex').child(auth.token.email.replace('@three-bears-hub.firebaseapp.com', '')).val() === newData.val()",
+            ".validate": "newData.isString()"
+          },
+          "pwChanged": {
+            ".write": "auth != null && auth.uid === $uid",
+            ".validate": "newData.isBoolean()"
+          },
+          "$other": { ".validate": false }
+        }
+      },
+
+      "phoneIndex": {
+        ".read": "auth != null && root.child($env).child('admins').child(auth.uid).val() === true",
+        ".write": "auth != null && root.child($env).child('admins').child(auth.uid).val() === true",
+        "$phone": {
+          ".read": "auth != null && auth.token.email === $phone + '@three-bears-hub.firebaseapp.com'",
+          ".validate": "$phone.matches(/^[0-9]{10}$/) && newData.isString()"
+        }
+      },
+
+      "admins": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child($env).child('admins').child(auth.uid).val() === true",
+        "$uid": { ".validate": "newData.isBoolean()" }
+      }
+    }
+  }
+}
