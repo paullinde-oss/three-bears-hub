@@ -1,5 +1,5 @@
 // Three Bears Hockey Hub — Service Worker v4.0
-const CACHE_NAME = 'three-bears-shell-v7';
+const CACHE_NAME = 'three-bears-shell-v8';
 
 const SHELL_ASSETS = [
   './',
@@ -10,8 +10,6 @@ const SHELL_ASSETS = [
   './hockey_rink.png',
   './parking_lot.png',
   './game_card_bg.png',
-  './avatar/avatar-kit.js',
-  './avatar/parts.json',
 ];
 
 self.addEventListener('install', event => {

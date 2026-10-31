@@ -805,7 +805,6 @@ tr.t-ir .stk     { background:#FFCDD2 !important; }
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="avatar/avatar-kit.js"></script>
 </head>
 <body>
 <div id="splashScreen" style="position:fixed;inset:0;background:#1A2B3C;z-index:10000;display:flex;align-items:center;justify-content:center;cursor:pointer;">
@@ -1056,70 +1055,12 @@ function initialsFor(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// =============== PIXEL AVATARS (avatar/avatar-kit.js) ===============
-// Each player's avatar choices live at /<root>/avatars/<playerId>; number, captain and goalie body come from the roster.
-let avatarsCache = {};
-let avatarKitReady = false;
-function setupAvatars() {
-  if (window.AvatarKit) {
-    AvatarKit.load('avatar/parts.json').then(() => { avatarKitReady = true; render(); })
-      .catch(e => console.warn('[Hub] avatar parts failed to load', e));
-  }
-  if (_firebaseReady) {
-    dbRef('avatars').on('value', snap => {
-      avatarsCache = snap.val() || {};
-      if (avatarKitReady) render();
-    }, e => console.warn('[Hub] avatars listener', e));
-  }
-}
-function avatarOptsFor(player) {
-  const s = activeSeason();
-  const re = s && player ? getRosterEntry(player.id, s.id) : null;
-  const type = re?.type || player?.type;
-  const pos = (player?.position || '').toUpperCase();
-  return { number: re?.jerseyNumber ?? player?.jerseyNumber ?? '', captain: !!re?.captain,
-           body: (type === 'goalie' || pos === 'G') ? 'goalie' : 'skater' };
-}
-function avatarUrl(player, full) {
-  const cfg = player && avatarsCache[player.id];
-  if (!cfg || !avatarKitReady) return null;
-  return AvatarKit.toDataURL(cfg, Object.assign(avatarOptsFor(player), full ? { scale: 3 } : { crop: true, scale: 3 }));
-}
-function editAvatar(playerId) {
-  const p = state.players.find(x => x.id === playerId);
-  if (!p) return;
-  if (!currentUser) { openLogin('Log in to edit your avatar'); return; }
-  if (playerId !== myPlayerId && !isAdmin) { toast('You can only edit your own avatar', 'bad'); return; }
-  if (!avatarKitReady) { toast('Avatar editor still loading, try again in a moment', 'bad'); return; }
-  closeModal();
-  AvatarKit.openEditor(Object.assign(avatarOptsFor(p), {
-    config: avatarsCache[playerId], title: playerId === myPlayerId ? 'Edit Your Avatar' : `Edit Avatar: ${p.name}`,
-    onSave: async cfg => {
-      // Firebase drops nulls, so empty choices (e.g. bald, no hat) are stored as 'none'
-      const rec = { v: 1, updatedAt: Date.now() };
-      Object.entries(cfg).forEach(([k, v]) => { if (k !== 'v') rec[k] = v == null ? 'none' : String(v); });
-      try {
-        await dbRef('avatars/' + playerId).set(rec);
-        avatarsCache[playerId] = rec;
-        toast('Avatar saved 🐻', 'good');
-        render();
-        openProfile(playerId);
-      } catch (e) { toast('Could not save avatar: ' + e.message, 'bad'); }
-    }
-  }));
-}
-
 function renderAvatar(player, size, flip) {
   const dims = { sm: 32, md: 56, lg: 88, xl: 132 };
   const d = dims[size] || 32;
   const fs = flip ? 'transform:scaleX(-1);' : '';
   if (player && player.spare) {
     return `<img src="data:image/png;base64,${SPARE_B64}" style="width:${d}px;height:${d}px;object-fit:contain;${fs}" alt="spare">`;
-  }
-  // Pixel avatars are never mirrored (the jersey number and captain C would read backwards)
-  const pix = avatarUrl(player);
-  if (pix) {
-    return `<img src="${pix}" style="width:${d}px;height:${d}px;border-radius:50%;flex-shrink:0;border:1px solid var(--line);background:#f2ede2;image-rendering:pixelated;" alt="">`;
   }
   const photo = player && player.photo;
   if (photo) {
@@ -1610,8 +1551,7 @@ function openAccountMenu() {
         <div class="help-text" style="margin:2px 0 0;">${fmtPhone(phone)}${isAdmin ? ' · <strong style="color:var(--rust);">Admin</strong>' : ''}</div></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;">
-      ${p ? `<button class="btn btn-rust" onclick="closeModal();openProfile('${p.id}')">👤 My Profile</button>
-      <button class="btn" onclick="closeModal();editAvatar('${p.id}')">🎨 Edit Avatar</button>` :
+      ${p ? `<button class="btn btn-rust" onclick="closeModal();openProfile('${p.id}')">👤 My Profile</button>` :
       `<div class="help-text">This login isn't linked to a player yet. Link it in Settings → Logins.</div>`}
       <button class="btn btn-ghost" onclick="promptNewPassword(false)">🔑 Change Password</button>
       <button class="btn btn-ghost" onclick="closeModal();logOut()">Log Out</button>
@@ -2587,7 +2527,6 @@ function openProfile(playerId, view) {
   const s = view === 'all' ? null : state.seasons.find(x => x.id === view);
   const re = s ? getRosterEntry(playerId, s.id) : getRosterEntry(playerId, cur?.id);
   const typeInfo = TYPE_INFO[re?.type] || null;
-  const canEditAvatar = playerId === myPlayerId || isAdmin;
   const isMe = playerId === myPlayerId;
   const beerBal = beerBalanceFor(playerId);
   const beerStatCls = beerBal > 0.01 ? 'beer-pos' : (beerBal < -0.01 ? 'beer-neg' : '');
@@ -2645,7 +2584,6 @@ function openProfile(playerId, view) {
     <div class="profile-header" style="flex-wrap:wrap;">
       <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
         ${renderAvatar(p, 'xl')}
-        ${canEditAvatar ? `<button class="btn btn-ghost btn-sm" onclick="editAvatar('${playerId}')">🎨 Edit Avatar</button>` : ''}
       </div>
       <div class="profile-info">
         <h3>${esc(p.name)}${re?.captain ? ' <span title="Captain" style="font-family:monospace;font-size:14px;background:var(--ink);color:#fff;border-radius:4px;padding:1px 6px;vertical-align:middle;">C</span>' : ''}</h3>
@@ -4237,7 +4175,6 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
   await loadState();
   applyAdminClass();
   render();
-  setupAvatars();
   if (_auth) _auth.onAuthStateChanged(refreshAccount);
   if (DATA_ROOT !== 'hub') {
     const b = document.createElement('div');
