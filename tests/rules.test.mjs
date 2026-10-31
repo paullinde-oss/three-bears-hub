@@ -27,7 +27,6 @@ await fetch(`http://127.0.0.1:9000/${ENV}/three-bears-state-v3.json?ns=demo-tb-d
 
 console.log('\n-- Logged-out visitor');
 await expect('read team state', true, () => get(ref(anon.db, `${ENV}/three-bears-state-v3`)));
-await expect('read avatars', true, () => get(ref(anon.db, `${ENV}/avatars`)));
 await expect('write team state', false, () => set(ref(anon.db, `${ENV}/three-bears-state-v3`), { value: 'hack', ts: 2 }));
 await expect('read phone numbers', false, () => get(ref(anon.db, `${ENV}/phoneIndex`)));
 await expect('read users', false, () => get(ref(anon.db, `${ENV}/users`)));
@@ -38,7 +37,6 @@ await expect('register phone 6045551234 -> player P1', true, () => set(ref(admin
 await expect('reject malformed phone key', false, () => set(ref(admin.db, `${ENV}/phoneIndex/12345`), 'P9'));
 await expect('read all phone numbers', true, () => get(ref(admin.db, `${ENV}/phoneIndex`)));
 await expect('link own login to player P0', true, () => set(ref(admin.db, `${ENV}/users/${adminUid}/playerId`), 'P0'));
-await expect('edit any avatar (P1)', true, () => set(ref(admin.db, `${ENV}/avatars/P1`), { v: 1, hair: 'mullet' }));
 
 console.log('\n-- Player P1 first login (account created with the default password, then claims their player)');
 const pCred = await createUserWithEmailAndPassword(player.auth, '6045551234' + DOMAIN, 'bears2027');
@@ -52,10 +50,6 @@ await expect('re-point claim to P2 afterwards', false, () => set(ref(player.db, 
 await expect('set pwChanged flag', true, () => set(ref(player.db, `${ENV}/users/${pUid}/pwChanged`), true));
 await expect('read own user record', true, () => get(ref(player.db, `${ENV}/users/${pUid}`)));
 await expect("read admin's user record", false, () => get(ref(player.db, `${ENV}/users/${adminUid}`)));
-await expect('save own avatar', true, () => set(ref(player.db, `${ENV}/avatars/P1`), { v: 1, hair: 'buzz', hairColor: 'blond', updatedAt: 5 }));
-await expect('save avatar with unknown field', false, () => set(ref(player.db, `${ENV}/avatars/P1`), { v: 1, evil: 'x' }));
-await expect('save avatar with huge value', false, () => set(ref(player.db, `${ENV}/avatars/P1`), { v: 1, hair: 'x'.repeat(200) }));
-await expect("edit someone else's avatar (P0)", false, () => set(ref(player.db, `${ENV}/avatars/P0`), { v: 1, hair: 'buzz' }));
 await expect('write team state (beers/payments)', false, () => set(ref(player.db, `${ENV}/three-bears-state-v3`), { value: 'x', ts: 9 }));
 await expect('make self admin', false, () => set(ref(player.db, `${ENV}/admins/${pUid}`), true));
 await expect('register a phone number', false, () => set(ref(player.db, `${ENV}/phoneIndex/6049999999`), 'P1'));
@@ -64,7 +58,6 @@ console.log('\n-- Stranger with an unregistered phone number');
 const sCred = await createUserWithEmailAndPassword(stranger.auth, '6047777777' + DOMAIN, 'whatever1');
 await expect('claim player P1', false, () => set(ref(stranger.db, `${ENV}/users/${sCred.user.uid}/playerId`), 'P1'));
 await expect('read P1 phone entry', false, () => get(ref(stranger.db, `${ENV}/phoneIndex/6045551234`)));
-await expect('edit avatar P1', false, () => set(ref(stranger.db, `${ENV}/avatars/P1`), { v: 1 }));
 
 console.log('\n-- Live data path (hub) behaves the same, other roots are refused');
 await expect('admin of hubdev cannot write hub state', false, () => set(ref(admin.db, `hub/three-bears-state-v3`), { value: 'x', ts: 1 }));

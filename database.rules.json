@@ -10,17 +10,6 @@
       },
       "three-bears-state-v2": { ".read": true },
 
-      "avatars": {
-        ".read": true,
-        "$playerId": {
-          ".write": "auth != null && (root.child($env).child('admins').child(auth.uid).val() === true || root.child($env).child('users').child(auth.uid).child('playerId').val() === $playerId)",
-          ".validate": "newData.hasChildren(['v'])",
-          "v": { ".validate": "newData.isNumber()" },
-          "updatedAt": { ".validate": "newData.isNumber()" },
-          "$field": { ".validate": "$field.matches(/^(skin|eyes|eyeColor|brows|mouth|hair|hairColor|facialHair|facialHairColor|hat|hatColor|glasses|earring)$/) && newData.isString() && newData.val().length <= 24" }
-        }
-      },
-
       "users": {
         ".read": "auth != null && root.child($env).child('admins').child(auth.uid).val() === true",
         "$uid": {

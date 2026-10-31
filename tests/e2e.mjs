@@ -38,7 +38,7 @@ await ctx.route('**/*', async r => {
   if (['localhost','127.0.0.1'].includes(u.hostname) && u.port === '8765' && u.pathname.endsWith('/index.html')) {
     const res = await r.fetch(); let html = await res.text();
     // point the app's Firebase at the local emulators
-    html = html.replace('<script src="avatar/avatar-kit.js"></script>', `<script src="avatar/avatar-kit.js"></script><script>
+    html = html.replace('<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>', `<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script><script>
       (function(){ const init = firebase.initializeApp.bind(firebase);
         firebase.initializeApp = cfg => { const app = init(Object.assign({}, cfg, { databaseURL: '${DB}?ns=${NS}' }));
           app.database().useEmulator('127.0.0.1', 9000); app.auth().useEmulator('${AUTH}'); return app; }; })();</script>`);
@@ -90,27 +90,13 @@ check('Ben login linked to roster player', !!benUid && users[benUid].pwChanged =
 check('pill shows Ben (not admin)', (await pg.locator('#adminPill').innerText()).trim() === '👤 Ben', await pg.locator('#adminPill').innerText());
 check('no admin buttons for Ben', await pg.locator('text=+ Add Player').count() === 0);
 
-console.log('-- Ben edits his avatar');
+console.log('-- Ben views his profile');
 await pg.click('#adminPill'); await pg.click('text=My Profile'); await pg.waitForTimeout(400);
 const prof = await modalText();
 check('profile shows season folder + All-time', prof.includes('SUMMER 2026') && prof.includes('All-time'));
 check('profile shows captain badge', await pg.locator('.profile-info h3 span[title=Captain]').count() === 1);
 await shot('e2e_profile');
-await pg.click('text=🎨 Edit Avatar'); await pg.waitForTimeout(500);
-await pg.click('.avk-opt[data-slot="hair"][data-v="mullet"]');
-await pg.click('.avk-tab[data-tab="facial"]'); await pg.click('.avk-opt[data-slot="facialHair"][data-v="full"]');
-await pg.click('.avk-tab[data-tab="hair"]'); await pg.click('.avk-dot[data-color="hairColor"][data-v="ginger"]');
-await shot('e2e_editor');
-await pg.click('.avk-btn.go'); await pg.waitForTimeout(1500);
-const av = await getv('hubdev/avatars/pB');
-check('avatar saved to database', av && av.hair === 'mullet' && av.facialHair === 'full' && av.hairColor === 'ginger', JSON.stringify(av));
-check('bald/no-hat stored as "none"', av && av.hat === 'none');
-await pg.evaluate(() => closeModal()); await pg.waitForTimeout(300);
-await pg.evaluate(() => setActiveTab('dashboard')); await pg.waitForTimeout(600);
-check('dashboard uses pixel avatar for Ben', await pg.locator('tr[data-pid="pB"] img[style*="pixelated"]').count() === 1);
-await shot('e2e_dashboard_avatar');
-const denied = await pg.evaluate(async () => { try { await dbRef('avatars/pA').set({ v: 1, hair: 'buzz' }); return false; } catch (e) { return true; } });
-check("Ben can't edit Paul's avatar (rules)", denied);
+await pg.evaluate(() => closeModal());
 const ok = await pg.evaluate(async () => saveState());
 check("Ben can't save team data", ok === false);
 
